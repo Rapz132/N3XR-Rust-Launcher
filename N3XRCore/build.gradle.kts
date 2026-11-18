@@ -43,7 +43,6 @@ val cargoBuild = tasks.register("cargoBuild") {
 
     inputs.dir("rust/src")
     inputs.file("rust/Cargo.toml")
-    inputs.file("rust/Cargo.lock")
 
     outputs.dir(n3xrJniLibs)
 
