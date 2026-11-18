@@ -20,7 +20,7 @@ val selectedRustAbis = when (projectArch) {
     )
 }
 
-val petlibJniLibs = layout.buildDirectory.dir("n3xr-jniLibs")
+val n3xrJniLibs = layout.buildDirectory.dir("n3xr-jniLibs")
 
 android {
     namespace = "com.n3xr.core"
@@ -35,12 +35,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-
-    sourceSets {
-        getByName("main") {
-            jniLibs.srcDir(petlibJniLibs)
-        }
-    }
 }
 
 val cargoBuild = tasks.register("cargoBuild") {
@@ -51,7 +45,7 @@ val cargoBuild = tasks.register("cargoBuild") {
     inputs.file("rust/Cargo.toml")
     inputs.file("rust/Cargo.lock")
 
-    outputs.dir(petlibJniLibs)
+    outputs.dir(n3xrJniLibs)
 
     doLast {
         fun runTool(command: List<String>): String? {
@@ -94,7 +88,7 @@ val cargoBuild = tasks.register("cargoBuild") {
             )
         }
 
-        val outputDir = petlibJniLibs.get().asFile
+        val outputDir = n3xrJniLibs.get().asFile
         outputDir.mkdirs()
 
         val command = mutableListOf(
@@ -131,6 +125,14 @@ val cargoBuild = tasks.register("cargoBuild") {
                 "N3XR Cargo build failed:\n$output"
             )
         }
+    }
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.jniLibs?.addStaticSourceDirectory(
+            n3xrJniLibs.get().asFile.apply { mkdirs() }.absolutePath
+        )
     }
 }
 
