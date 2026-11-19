@@ -42,7 +42,7 @@ import com.movtery.zalithlauncher.game.account.AccountsManager
 import com.movtery.zalithlauncher.game.path.GamePathManager
 import com.movtery.zalithlauncher.keepalive.TaskKeepAlive
 import com.movtery.zalithlauncher.path.IMAGE_LOADER_CLIENT
-import com.movtery.zalith.zalithlauncher.path.PathManager
+import com.movtery.zalithlauncher.path.PathManager
 import com.movtery.zalithlauncher.setting.loadAllSettings
 import com.movtery.zalithlauncher.ui.activities.showFatalError
 import com.movtery.zalithlauncher.ui.activities.showLauncherCrash
