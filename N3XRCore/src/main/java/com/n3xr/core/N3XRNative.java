@@ -2,6 +2,7 @@
 package com.n3xr.core;
 
 public final class N3XRNative {
+
     private static final boolean AVAILABLE;
     private static final Throwable LOAD_ERROR;
 
@@ -18,8 +19,7 @@ public final class N3XRNative {
         AVAILABLE = error == null;
     }
 
-    private N3XRNative() {
-    }
+    private N3XRNative() {}
 
     public static boolean isAvailable() {
         return AVAILABLE;
@@ -32,4 +32,10 @@ public final class N3XRNative {
     public static native String nativeVersion();
 
     public static native int nativeAdd(int a, int b);
+
+    public static native String nativeArchitecture();
+
+    public static native String nativeOperatingSystem();
+
+    public static native int nativeCpuThreads();
 }
