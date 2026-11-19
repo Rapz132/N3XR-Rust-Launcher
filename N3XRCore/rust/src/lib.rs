@@ -1,12 +1,19 @@
-use std::path::Path;
-use jni::objects::JClass;
+
+use jni::objects::{JClass, JString};
 use jni::sys::{jfloat, jint, jstring};
 use jni::JNIEnv;
+
 use std::fs;
+use std::path::Path;
 use std::sync::Mutex;
 use std::thread;
+use std::time::UNIX_EPOCH;
 
 static CPU_STATE: Mutex<Option<(u64, u64)>> = Mutex::new(None);
+
+// ==========================================
+// STRING HELPER
+// ==========================================
 
 fn make_string(env: &mut JNIEnv, value: String) -> jstring {
     env.new_string(value)
@@ -14,19 +21,9 @@ fn make_string(env: &mut JNIEnv, value: String) -> jstring {
         .unwrap_or(std::ptr::null_mut())
 }
 
-fn read_value(file: &str, key: &str) -> Option<u64> {
-    let content = fs::read_to_string(file).ok()?;
-
-    content.lines().find_map(|line| {
-        let mut parts = line.split_whitespace();
-
-        if parts.next()? == key {
-            parts.next()?.parse().ok()
-        } else {
-            None
-        }
-    })
-}
+// ==========================================
+// CPU MONITOR
+// ==========================================
 
 fn cpu_counters() -> Option<(u64, u64)> {
     let content = fs::read_to_string("/proc/stat").ok()?;
@@ -84,15 +81,33 @@ fn cpu_usage() -> f32 {
     usage.clamp(0.0, 100.0)
 }
 
+// ==========================================
+// MEMORY MONITOR
+// ==========================================
+
+fn read_value(file: &str, key: &str) -> Option<u64> {
+    let content = fs::read_to_string(file).ok()?;
+
+    content.lines().find_map(|line| {
+        let mut parts = line.split_whitespace();
+
+        if parts.next()? == key {
+            parts.next()?.parse().ok()
+        } else {
+            None
+        }
+    })
+}
+
 fn memory_info() -> String {
     let total = read_value("/proc/meminfo", "MemTotal:");
     let available = read_value("/proc/meminfo", "MemAvailable:");
 
     match (total, available) {
-        (Some(t), Some(a)) => format!(
+        (Some(total), Some(available)) => format!(
             "Total: {} MB | Available: {} MB",
-            t / 1024,
-            a / 1024
+            total / 1024,
+            available / 1024
         ),
         _ => "Unavailable".to_string(),
     }
@@ -118,12 +133,86 @@ fn process_memory_info() -> String {
     format!("RSS: {} | Peak: {}", rss, peak)
 }
 
+// ==========================================
+// FILE & RESOURCE MANAGER
+// ==========================================
+
+fn directory_info(path: &str) -> String {
+    let directory = Path::new(path);
+
+    if !directory.exists() {
+        return "Directory does not exist".to_string();
+    }
+
+    if !directory.is_dir() {
+        return "Path is not a directory".to_string();
+    }
+
+    let entries = match fs::read_dir(directory) {
+        Ok(value) => value,
+        Err(_) => return "Permission denied or unreadable".to_string(),
+    };
+
+    let mut files = 0u64;
+    let mut folders = 0u64;
+    let mut total_size = 0u64;
+
+    for entry in entries.flatten() {
+        let metadata = match entry.metadata() {
+            Ok(value) => value,
+            Err(_) => continue,
+        };
+
+        if metadata.is_dir() {
+            folders += 1;
+        } else if metadata.is_file() {
+            files += 1;
+            total_size = total_size.saturating_add(metadata.len());
+        }
+    }
+
+    format!(
+        "Files: {} | Folders: {} | Size: {} MB",
+        files,
+        folders,
+        total_size / (1024 * 1024)
+    )
+}
+
+fn file_info(path: &str) -> String {
+    let metadata = match fs::metadata(path) {
+        Ok(value) => value,
+        Err(_) => return "File unavailable".to_string(),
+    };
+
+    if !metadata.is_file() {
+        return "Not a regular file".to_string();
+    }
+
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_secs().to_string())
+        .unwrap_or_else(|| "Unknown".to_string());
+
+    format!(
+        "Size: {} bytes | Modified: {}",
+        metadata.len(),
+        modified
+    )
+}
+
+// ==========================================
+// JNI: VERSION & BASIC SYSTEM
+// ==========================================
+
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeVersion(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
-    make_string(&mut env, "N3XR Rust Core 0.5.0".to_string())
+    make_string(&mut env, "N3XR Rust Core 0.6.0".to_string())
 }
 
 #[no_mangle]
@@ -162,6 +251,10 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeCpuThreads(
         .unwrap_or(1)
 }
 
+// ==========================================
+// JNI: MEMORY
+// ==========================================
+
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeDeviceMemoryInfo(
     mut env: JNIEnv,
@@ -178,6 +271,10 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeProcessMemoryInfo(
     make_string(&mut env, process_memory_info())
 }
 
+// ==========================================
+// JNI: CPU
+// ==========================================
+
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeCpuUsagePercent(
     _env: JNIEnv,
@@ -186,14 +283,26 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeCpuUsagePercent(
     cpu_usage()
 }
 
+// ==========================================
+// JNI: SYSTEM REPORT
+// ==========================================
+
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeSystemReport(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
+    let usage = cpu_usage();
+
+    let cpu_text = if usage < 0.0 {
+        "Collecting baseline".to_string()
+    } else {
+        format!("{:.1}%", usage)
+    };
+
     let report = format!(
         "N3XR SYSTEM REPORT\n\
-         Version: 0.5.0\n\
+         Version: 0.6.0\n\
          OS: {}\n\
          Architecture: {}\n\
          CPU Threads: {}\n\
@@ -205,17 +314,42 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeSystemReport(
         thread::available_parallelism()
             .map(|count| count.get())
             .unwrap_or(1),
-        {
-            let usage = cpu_usage();
-            if usage < 0.0 {
-                "Collecting baseline".to_string()
-            } else {
-                format!("{:.1}%", usage)
-            }
-        },
+        cpu_text,
         memory_info(),
         process_memory_info()
     );
 
     make_string(&mut env, report)
+}
+
+// ==========================================
+// JNI: FILE INFORMATION
+// ==========================================
+
+#[no_mangle]
+pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeDirectoryInfo(
+    mut env: JNIEnv,
+    _class: JClass,
+    path: jni::objects::JString,
+) -> jstring {
+    let path: String = match env.get_string(&path) {
+        Ok(value) => value.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    make_string(&mut env, directory_info(&path))
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeFileInfo(
+    mut env: JNIEnv,
+    _class: JClass,
+    path: jni::objects::JString,
+) -> jstring {
+    let path: String = match env.get_string(&path) {
+        Ok(value) => value.into(),
+        Err(_) => return std::ptr::null_mut(),
+    };
+
+    make_string(&mut env, file_info(&path))
 }
