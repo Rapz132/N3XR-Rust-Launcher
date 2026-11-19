@@ -361,7 +361,7 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeSystemReport(
 
     let report = format!(
         "N3XR SYSTEM REPORT\n\
-         Version: 0.7.0\n\
+         Version: 0.8.0\n\
          OS: {}\n\
          Architecture: {}\n\
          CPU Threads: {}\n\
