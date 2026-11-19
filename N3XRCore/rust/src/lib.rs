@@ -11,19 +11,11 @@ use std::time::UNIX_EPOCH;
 
 static CPU_STATE: Mutex<Option<(u64, u64)>> = Mutex::new(None);
 
-// ==========================================
-// STRING HELPER
-// ==========================================
-
 fn make_string(env: &mut JNIEnv, value: String) -> jstring {
     env.new_string(value)
         .map(|s| s.into_raw())
         .unwrap_or(std::ptr::null_mut())
 }
-
-// ==========================================
-// CPU MONITOR
-// ==========================================
 
 fn cpu_counters() -> Option<(u64, u64)> {
     let content = fs::read_to_string("/proc/stat").ok()?;
@@ -81,10 +73,6 @@ fn cpu_usage() -> f32 {
     usage.clamp(0.0, 100.0)
 }
 
-// ==========================================
-// MEMORY MONITOR
-// ==========================================
-
 fn read_value(file: &str, key: &str) -> Option<u64> {
     let content = fs::read_to_string(file).ok()?;
 
@@ -100,10 +88,10 @@ fn read_value(file: &str, key: &str) -> Option<u64> {
 }
 
 fn memory_info() -> String {
-    let total = read_value("/proc/meminfo", "MemTotal:");
-    let available = read_value("/proc/meminfo", "MemAvailable:");
-
-    match (total, available) {
+    match (
+        read_value("/proc/meminfo", "MemTotal:"),
+        read_value("/proc/meminfo", "MemAvailable:"),
+    ) {
         (Some(total), Some(available)) => format!(
             "Total: {} MB | Available: {} MB",
             total / 1024,
@@ -132,10 +120,6 @@ fn process_memory_info() -> String {
 
     format!("RSS: {} | Peak: {}", rss, peak)
 }
-
-// ==========================================
-// FILE & RESOURCE MANAGER
-// ==========================================
 
 fn directory_info(path: &str) -> String {
     let directory = Path::new(path);
@@ -203,10 +187,6 @@ fn file_info(path: &str) -> String {
     )
 }
 
-// ==========================================
-// NETWORK MONITOR
-// ==========================================
-
 fn network_info() -> String {
     let content = match fs::read_to_string("/proc/net/dev") {
         Ok(value) => value,
@@ -214,7 +194,7 @@ fn network_info() -> String {
     };
 
     let mut report = String::from("NETWORK MONITOR\n");
-    let mut interface_count = 0u32;
+    let mut count = 0u32;
 
     for line in content.lines().skip(2) {
         let (name, statistics) = match line.split_once(':') {
@@ -231,47 +211,32 @@ fn network_info() -> String {
             continue;
         }
 
-        let interface = name.trim();
-
-        if interface.is_empty() {
-            continue;
-        }
-
-        let received = values[0];
-        let transmitted = values[8];
-
-        interface_count += 1;
+        count += 1;
 
         report.push_str(&format!(
             "{} | RX: {} bytes | TX: {} bytes\n",
-            interface,
-            received,
-            transmitted
+            name.trim(),
+            values[0],
+            values[8]
         ));
     }
 
-    if interface_count == 0 {
+    if count == 0 {
         return "No network interfaces detected".to_string();
     }
 
-    report.push_str(&format!(
-        "Interfaces detected: {}",
-        interface_count
-    ));
-
+    report.push_str(&format!("Interfaces detected: {}", count));
     report
 }
 
-// ==========================================
-// JNI: BASIC SYSTEM
-// ==========================================
+// BASIC SYSTEM
 
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeVersion(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
-    make_string(&mut env, "N3XR Rust Core 0.7.0".to_string())
+    make_string(&mut env, "N3XR Rust Core 0.8.0".to_string())
 }
 
 #[no_mangle]
@@ -310,9 +275,7 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeCpuThreads(
         .unwrap_or(1)
 }
 
-// ==========================================
-// JNI: MEMORY
-// ==========================================
+// MEMORY
 
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeDeviceMemoryInfo(
@@ -330,9 +293,7 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeProcessMemoryInfo(
     make_string(&mut env, process_memory_info())
 }
 
-// ==========================================
-// JNI: CPU
-// ==========================================
+// CPU
 
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeCpuUsagePercent(
@@ -342,9 +303,7 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeCpuUsagePercent(
     cpu_usage()
 }
 
-// ==========================================
-// JNI: SYSTEM REPORT
-// ==========================================
+// SYSTEM REPORT
 
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeSystemReport(
@@ -381,9 +340,7 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeSystemReport(
     make_string(&mut env, report)
 }
 
-// ==========================================
-// JNI: FILE INFORMATION
-// ==========================================
+// FILE INFORMATION
 
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeDirectoryInfo(
@@ -413,9 +370,7 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeFileInfo(
     make_string(&mut env, file_info(&path))
 }
 
-// ==========================================
-// JNI: NETWORK MONITOR
-// ==========================================
+// NETWORK
 
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeNetworkInfo(
