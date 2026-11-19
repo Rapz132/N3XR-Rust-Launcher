@@ -50,4 +50,6 @@ public final class N3XRNative {
    public static native String nativeDirectoryInfo(String path);
 
    public static native String nativeFileInfo(String path);
+  
+   public static native String nativeNetworkInfo();
 }
