@@ -140,42 +140,50 @@ class ZLApplication : Application(), SingletonImageLoader.Factory {
     /**
      * Test N3XR Rust native library.
      */
-    private fun testN3XRNative() {
-        try {
-            if (!N3XRNative.isAvailable()) {
-                throw IllegalStateException(
-                    "Native library failed to load",
-                    N3XRNative.loadError()
-                )
-            }
-
-            val version = N3XRNative.nativeVersion()
-            val result = N3XRNative.nativeAdd(10, 20)
-
-            val message = """
-                N3XR Rust JNI: LOADED
-                Version: $version
-                10 + 20 = $result
-            """.trimIndent()
-
-            Log.i("N3XR-JNI", message)
-
-            Toast.makeText(
-                this,
-                message,
-                Toast.LENGTH_LONG
-            ).show()
-
-        } catch (error: Throwable) {
-            Log.e("N3XR-JNI", "Rust JNI test failed", error)
-
-            Toast.makeText(
-                this,
-                "N3XR Rust JNI FAILED: ${error.message}",
-                Toast.LENGTH_LONG
-            ).show()
+    
+private fun testN3XRNative() {
+    try {
+        if (!N3XRNative.isAvailable()) {
+            throw IllegalStateException(
+                "Native library failed to load",
+                N3XRNative.loadError()
+            )
         }
+
+        val version = N3XRNative.nativeVersion()
+        val result = N3XRNative.nativeAdd(10, 20)
+        val architecture = N3XRNative.nativeArchitecture()
+        val os = N3XRNative.nativeOperatingSystem()
+        val threads = N3XRNative.nativeCpuThreads()
+
+        val message = """
+            N3XR Rust JNI: LOADED
+            Version: $version
+            Architecture: $architecture
+            OS: $os
+            CPU Threads: $threads
+            10 + 20 = $result
+        """.trimIndent()
+
+        Log.i("N3XR-JNI", message)
+
+        Toast.makeText(
+            this,
+            message,
+            Toast.LENGTH_LONG
+        ).show()
+
+    } catch (error: Throwable) {
+        Log.e("N3XR-JNI", "Rust JNI test failed", error)
+
+        Toast.makeText(
+            this,
+            "N3XR Rust JNI FAILED: ${error.message}",
+            Toast.LENGTH_LONG
+        ).show()
     }
+}
+
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
