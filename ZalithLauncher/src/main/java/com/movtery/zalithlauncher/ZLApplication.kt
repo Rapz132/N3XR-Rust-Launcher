@@ -141,6 +141,7 @@ class ZLApplication : Application(), SingletonImageLoader.Factory {
      * Test N3XR Rust native library.
      */
     
+
 private fun testN3XRNative() {
     try {
         if (!N3XRNative.isAvailable()) {
@@ -151,25 +152,29 @@ private fun testN3XRNative() {
         }
 
         val version = N3XRNative.nativeVersion()
-        val result = N3XRNative.nativeAdd(10, 20)
+        val addition = N3XRNative.nativeAdd(10, 20)
         val architecture = N3XRNative.nativeArchitecture()
         val os = N3XRNative.nativeOperatingSystem()
         val threads = N3XRNative.nativeCpuThreads()
+        val deviceMemory = N3XRNative.nativeDeviceMemoryInfo()
+        val processMemory = N3XRNative.nativeProcessMemoryInfo()
 
-        val message = """
+        val report = """
             N3XR Rust JNI: LOADED
             Version: $version
             Architecture: $architecture
             OS: $os
             CPU Threads: $threads
-            10 + 20 = $result
+            Addition: 10 + 20 = $addition
+            Device Memory: $deviceMemory
+            Process Memory: $processMemory
         """.trimIndent()
 
-        Log.i("N3XR-JNI", message)
+        Log.i("N3XR-JNI", report)
 
         Toast.makeText(
             this,
-            message,
+            "N3XR Rust Core 0.3.0 LOADED",
             Toast.LENGTH_LONG
         ).show()
 
@@ -183,6 +188,7 @@ private fun testN3XRNative() {
         ).show()
     }
 }
+
 
 
     override fun onConfigurationChanged(newConfig: Configuration) {
