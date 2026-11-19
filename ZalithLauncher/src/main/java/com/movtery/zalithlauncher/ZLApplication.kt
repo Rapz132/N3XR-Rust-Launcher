@@ -90,6 +90,9 @@ class ZLApplication : Application(), SingletonImageLoader.Factory {
         }
 
         super.onCreate()
+        
+        testN3XRNative()
+
         runCatching {
             Fishnet.init(this, PathManager.DIR_NATIVE_LOGS.absolutePath)
 
