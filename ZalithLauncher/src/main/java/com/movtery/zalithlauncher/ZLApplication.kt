@@ -35,6 +35,8 @@ import coil3.svg.SvgDecoder
 import com.kyant.fishnet.Fishnet
 import com.movtery.zalithlauncher.context.GlobalContext
 import com.movtery.zalithlauncher.context.refreshContext
+import android.widget.Toast
+import com.n3xr.core.N3XRNative
 import com.movtery.zalithlauncher.coroutine.TaskSystem
 import com.movtery.zalithlauncher.game.account.AccountsManager
 import com.movtery.zalithlauncher.game.path.GamePathManager
