@@ -19,7 +19,8 @@ public final class N3XRNative {
         AVAILABLE = error == null;
     }
 
-    private N3XRNative() {}
+    private N3XRNative() {
+    }
 
     public static boolean isAvailable() {
         return AVAILABLE;
