@@ -44,4 +44,6 @@ public final class N3XRNative {
     public static native String nativeProcessMemoryInfo();
 
     public static native float nativeCpuUsagePercent();
+
+    public static native String nativeSystemReport();
 }
