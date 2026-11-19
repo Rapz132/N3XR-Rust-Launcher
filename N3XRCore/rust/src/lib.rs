@@ -2,32 +2,26 @@
 use jni::objects::{JClass, JString};
 use jni::sys::{jfloat, jint, jstring};
 use jni::JNIEnv;
-
 use std::fs;
 use std::path::Path;
 use std::sync::Mutex;
-use std::thread;
-use std::time::UNIX_EPOCH;
 
-static CPU_STATE: Mutex<Option<(u64, u64)>> = Mutex::new(None);
+static CPU_PREVIOUS: Mutex<Option<(u64, u64)>> = Mutex::new(None);
 
 fn make_string(env: &mut JNIEnv, value: String) -> jstring {
-    env.new_string(value)
-        .map(|s| s.into_raw())
-        .unwrap_or(std::ptr::null_mut())
+    match env.new_string(value) {
+        Ok(value) => value.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
 }
 
-fn cpu_counters() -> Option<(u64, u64)> {
+fn read_cpu() -> Option<(u64, u64)> {
     let content = fs::read_to_string("/proc/stat").ok()?;
     let line = content.lines().next()?;
-    let mut parts = line.split_whitespace();
-
-    if parts.next()? != "cpu" {
-        return None;
-    }
-
-    let values: Vec<u64> = parts
-        .filter_map(|value| value.parse().ok())
+    let values: Vec<u64> = line
+        .split_whitespace()
+        .skip(1)
+        .filter_map(|v| v.parse().ok())
         .collect();
 
     if values.len() < 4 {
@@ -41,202 +35,180 @@ fn cpu_counters() -> Option<(u64, u64)> {
 }
 
 fn cpu_usage() -> f32 {
-    let current = match cpu_counters() {
+    let current = match read_cpu() {
         Some(value) => value,
         None => return -1.0,
     };
 
-    let mut state = match CPU_STATE.lock() {
+    let mut previous = match CPU_PREVIOUS.lock() {
         Ok(value) => value,
         Err(_) => return -1.0,
     };
 
-    let previous = *state;
-    *state = Some(current);
+    let result = if let Some(old) = *previous {
+        let total_diff = current.0.saturating_sub(old.0);
+        let idle_diff = current.1.saturating_sub(old.1);
 
-    let (old_total, old_idle) = match previous {
-        Some(value) => value,
-        None => return -1.0,
+        if total_diff == 0 {
+            -1.0
+        } else {
+            ((total_diff.saturating_sub(idle_diff)) as f32
+                / total_diff as f32 * 100.0)
+                .clamp(0.0, 100.0)
+        }
+    } else {
+        -1.0
     };
 
-    let total_delta = current.0.saturating_sub(old_total);
-    let idle_delta = current.1.saturating_sub(old_idle);
-
-    if total_delta == 0 {
-        return -1.0;
-    }
-
-    let usage =
-        100.0 * total_delta.saturating_sub(idle_delta) as f32
-        / total_delta as f32;
-
-    usage.clamp(0.0, 100.0)
-}
-
-fn read_value(file: &str, key: &str) -> Option<u64> {
-    let content = fs::read_to_string(file).ok()?;
-
-    content.lines().find_map(|line| {
-        let mut parts = line.split_whitespace();
-
-        if parts.next()? == key {
-            parts.next()?.parse().ok()
-        } else {
-            None
-        }
-    })
+    *previous = Some(current);
+    result
 }
 
 fn memory_info() -> String {
-    match (
-        read_value("/proc/meminfo", "MemTotal:"),
-        read_value("/proc/meminfo", "MemAvailable:"),
-    ) {
-        (Some(total), Some(available)) => format!(
-            "Total: {} MB | Available: {} MB",
-            total / 1024,
-            available / 1024
-        ),
-        _ => "Unavailable".to_string(),
+    match fs::read_to_string("/proc/meminfo") {
+        Ok(content) => content
+            .lines()
+            .filter(|line| {
+                line.starts_with("MemTotal:")
+                    || line.starts_with("MemAvailable:")
+                    || line.starts_with("MemFree:")
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+        Err(_) => "Memory information unavailable".to_string(),
     }
 }
 
 fn process_memory_info() -> String {
-    let content = match fs::read_to_string("/proc/self/status") {
-        Ok(value) => value,
-        Err(_) => return "Unavailable".to_string(),
-    };
-
-    let mut rss = "Unavailable".to_string();
-    let mut peak = "Unavailable".to_string();
-
-    for line in content.lines() {
-        if line.starts_with("VmRSS:") {
-            rss = line.replace("VmRSS:", "").trim().to_string();
-        } else if line.starts_with("VmHWM:") {
-            peak = line.replace("VmHWM:", "").trim().to_string();
-        }
+    match fs::read_to_string("/proc/self/status") {
+        Ok(content) => content
+            .lines()
+            .filter(|line| {
+                line.starts_with("VmRSS:")
+                    || line.starts_with("VmHWM:")
+                    || line.starts_with("VmSize:")
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+        Err(_) => "Process memory unavailable".to_string(),
     }
-
-    format!("RSS: {} | Peak: {}", rss, peak)
-}
-
-fn directory_info(path: &str) -> String {
-    let directory = Path::new(path);
-
-    if !directory.exists() {
-        return "Directory does not exist".to_string();
-    }
-
-    if !directory.is_dir() {
-        return "Path is not a directory".to_string();
-    }
-
-    let entries = match fs::read_dir(directory) {
-        Ok(value) => value,
-        Err(_) => return "Permission denied or unreadable".to_string(),
-    };
-
-    let mut files = 0u64;
-    let mut folders = 0u64;
-    let mut total_size = 0u64;
-
-    for entry in entries.flatten() {
-        let metadata = match entry.metadata() {
-            Ok(value) => value,
-            Err(_) => continue,
-        };
-
-        if metadata.is_dir() {
-            folders += 1;
-        } else if metadata.is_file() {
-            files += 1;
-            total_size = total_size.saturating_add(metadata.len());
-        }
-    }
-
-    format!(
-        "Files: {} | Folders: {} | Size: {} MB",
-        files,
-        folders,
-        total_size / (1024 * 1024)
-    )
-}
-
-fn file_info(path: &str) -> String {
-    let metadata = match fs::metadata(path) {
-        Ok(value) => value,
-        Err(_) => return "File unavailable".to_string(),
-    };
-
-    if !metadata.is_file() {
-        return "Not a regular file".to_string();
-    }
-
-    let modified = metadata
-        .modified()
-        .ok()
-        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-        .map(|duration| duration.as_secs().to_string())
-        .unwrap_or_else(|| "Unknown".to_string());
-
-    format!(
-        "Size: {} bytes | Modified: {}",
-        metadata.len(),
-        modified
-    )
 }
 
 fn network_info() -> String {
-    let content = match fs::read_to_string("/proc/net/dev") {
-        Ok(value) => value,
-        Err(_) => return "Network statistics unavailable".to_string(),
-    };
+    match fs::read_to_string("/proc/net/dev") {
+        Ok(content) => {
+            let mut result = Vec::new();
 
-    let mut report = String::from("NETWORK MONITOR\n");
-    let mut count = 0u32;
+            for line in content.lines().skip(2) {
+                let Some((name, data)) = line.split_once(':') else {
+                    continue;
+                };
 
-    for line in content.lines().skip(2) {
-        let (name, statistics) = match line.split_once(':') {
-            Some(value) => value,
-            None => continue,
-        };
+                let values: Vec<&str> = data.split_whitespace().collect();
 
-        let values: Vec<u64> = statistics
-            .split_whitespace()
-            .filter_map(|value| value.parse().ok())
-            .collect();
+                if values.len() < 9 {
+                    continue;
+                }
 
-        if values.len() < 9 {
-            continue;
+                result.push(format!(
+                    "{} RX={} bytes TX={} bytes",
+                    name.trim(),
+                    values[0],
+                    values[8]
+                ));
+            }
+
+            if result.is_empty() {
+                "No network interfaces found".to_string()
+            } else {
+                result.join("\n")
+            }
         }
-
-        count += 1;
-
-        report.push_str(&format!(
-            "{} | RX: {} bytes | TX: {} bytes\n",
-            name.trim(),
-            values[0],
-            values[8]
-        ));
+        Err(_) => "Network information unavailable".to_string(),
     }
-
-    if count == 0 {
-        return "No network interfaces detected".to_string();
-    }
-
-    report.push_str(&format!("Interfaces detected: {}", count));
-    report
 }
 
-// BASIC SYSTEM
+fn directory_info(path: &str) -> String {
+    let target = Path::new(path);
+
+    if !target.is_dir() {
+        return "Directory unavailable or inaccessible".to_string();
+    }
+
+    match fs::read_dir(target) {
+        Ok(entries) => {
+            let mut count = 0usize;
+
+            for entry in entries {
+                if entry.is_ok() {
+                    count += 1;
+                }
+            }
+
+            format!("Directory: {}\nEntries: {}", path, count)
+        }
+        Err(_) => "Cannot read directory".to_string(),
+    }
+}
+
+fn file_info(path: &str) -> String {
+    match fs::metadata(path) {
+        Ok(metadata) => format!(
+            "Path: {}\nSize: {} bytes\nFile: {}\nDirectory: {}",
+            path,
+            metadata.len(),
+            metadata.is_file(),
+            metadata.is_dir()
+        ),
+        Err(_) => "File information unavailable".to_string(),
+    }
+}
+
+fn system_report() -> String {
+    format!(
+        "N3XR Rust Core 0.9.0\nArchitecture: {}\nOS: {}\nCPU threads: {}\nCPU usage: {:.2}%\n\nDevice memory:\n{}\n\nProcess memory:\n{}\n\nNetwork:\n{}",
+        std::env::consts::ARCH,
+        std::env::consts::OS,
+        std::thread::available_parallelism()
+            .map(|v| v.get())
+            .unwrap_or(0),
+        cpu_usage(),
+        memory_info(),
+        process_memory_info(),
+        network_info()
+    )
+}
+
+fn health_check() -> String {
+    let proc_stat = Path::new("/proc/stat").exists();
+    let proc_mem = Path::new("/proc/meminfo").exists();
+    let proc_net = Path::new("/proc/net/dev").exists();
+
+    format!(
+        "N3XR Rust Core Health Check\nVersion: 0.9.0\nArchitecture: {}\nOS: {}\n/proc/stat: {}\n/proc/meminfo: {}\n/proc/net/dev: {}\nStatus: {}",
+        std::env::consts::ARCH,
+        std::env::consts::OS,
+        if proc_stat { "OK" } else { "UNAVAILABLE" },
+        if proc_mem { "OK" } else { "UNAVAILABLE" },
+        if proc_net { "OK" } else { "UNAVAILABLE" },
+        if proc_stat && proc_mem { "HEALTHY" } else { "LIMITED" }
+    )
+}
+
+fn diagnostics() -> String {
+    format!(
+        "{}\n\n{}",
+        health_check(),
+        system_report()
+    )
+}
 
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeVersion(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
-    make_string(&mut env, "N3XR Rust Core 0.8.0".to_string())
+    make_string(&mut env, "N3XR Rust Core 0.9.0".to_string())
 }
 
 #[no_mangle]
@@ -270,12 +242,10 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeCpuThreads(
     _env: JNIEnv,
     _class: JClass,
 ) -> jint {
-    thread::available_parallelism()
-        .map(|count| count.get() as jint)
-        .unwrap_or(1)
+    std::thread::available_parallelism()
+        .map(|v| v.get() as jint)
+        .unwrap_or(0)
 }
-
-// MEMORY
 
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeDeviceMemoryInfo(
@@ -293,8 +263,6 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeProcessMemoryInfo(
     make_string(&mut env, process_memory_info())
 }
 
-// CPU
-
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeCpuUsagePercent(
     _env: JNIEnv,
@@ -303,44 +271,13 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeCpuUsagePercent(
     cpu_usage()
 }
 
-// SYSTEM REPORT
-
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeSystemReport(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
-    let usage = cpu_usage();
-
-    let cpu_text = if usage < 0.0 {
-        "Collecting baseline".to_string()
-    } else {
-        format!("{:.1}%", usage)
-    };
-
-    let report = format!(
-        "N3XR SYSTEM REPORT\n\
-         Version: 0.8.0\n\
-         OS: {}\n\
-         Architecture: {}\n\
-         CPU Threads: {}\n\
-         CPU Usage: {}\n\
-         Device Memory: {}\n\
-         Process Memory: {}",
-        std::env::consts::OS,
-        std::env::consts::ARCH,
-        thread::available_parallelism()
-            .map(|count| count.get())
-            .unwrap_or(1),
-        cpu_text,
-        memory_info(),
-        process_memory_info()
-    );
-
-    make_string(&mut env, report)
+    make_string(&mut env, system_report())
 }
-
-// FILE INFORMATION
 
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeDirectoryInfo(
@@ -370,12 +307,26 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeFileInfo(
     make_string(&mut env, file_info(&path))
 }
 
-// NETWORK
-
 #[no_mangle]
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeNetworkInfo(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
     make_string(&mut env, network_info())
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeHealthCheck(
+    mut env: JNIEnv,
+    _class: JClass,
+) -> jstring {
+    make_string(&mut env, health_check())
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeDiagnostics(
+    mut env: JNIEnv,
+    _class: JClass,
+) -> jstring {
+    make_string(&mut env, diagnostics())
 }
