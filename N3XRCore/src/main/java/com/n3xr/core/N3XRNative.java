@@ -52,4 +52,8 @@ public final class N3XRNative {
     public static native String nativeFileInfo(String path);
 
     public static native String nativeNetworkInfo();
+
+    public static native String nativeHealthCheck();
+
+    public static native String nativeDiagnostics();
 }
