@@ -204,7 +204,66 @@ fn file_info(path: &str) -> String {
 }
 
 // ==========================================
-// JNI: VERSION & BASIC SYSTEM
+// NETWORK MONITOR
+// ==========================================
+
+fn network_info() -> String {
+    let content = match fs::read_to_string("/proc/net/dev") {
+        Ok(value) => value,
+        Err(_) => return "Network statistics unavailable".to_string(),
+    };
+
+    let mut report = String::from("NETWORK MONITOR\n");
+    let mut interface_count = 0u32;
+
+    for line in content.lines().skip(2) {
+        let (name, statistics) = match line.split_once(':') {
+            Some(value) => value,
+            None => continue,
+        };
+
+        let values: Vec<u64> = statistics
+            .split_whitespace()
+            .filter_map(|value| value.parse().ok())
+            .collect();
+
+        if values.len() < 9 {
+            continue;
+        }
+
+        let interface = name.trim();
+
+        if interface.is_empty() {
+            continue;
+        }
+
+        let received = values[0];
+        let transmitted = values[8];
+
+        interface_count += 1;
+
+        report.push_str(&format!(
+            "{} | RX: {} bytes | TX: {} bytes\n",
+            interface,
+            received,
+            transmitted
+        ));
+    }
+
+    if interface_count == 0 {
+        return "No network interfaces detected".to_string();
+    }
+
+    report.push_str(&format!(
+        "Interfaces detected: {}",
+        interface_count
+    ));
+
+    report
+}
+
+// ==========================================
+// JNI: BASIC SYSTEM
 // ==========================================
 
 #[no_mangle]
@@ -212,7 +271,7 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeVersion(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
-    make_string(&mut env, "N3XR Rust Core 0.6.0".to_string())
+    make_string(&mut env, "N3XR Rust Core 0.7.0".to_string())
 }
 
 #[no_mangle]
@@ -302,7 +361,7 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeSystemReport(
 
     let report = format!(
         "N3XR SYSTEM REPORT\n\
-         Version: 0.6.0\n\
+         Version: 0.7.0\n\
          OS: {}\n\
          Architecture: {}\n\
          CPU Threads: {}\n\
@@ -330,7 +389,7 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeSystemReport(
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeDirectoryInfo(
     mut env: JNIEnv,
     _class: JClass,
-    path: jni::objects::JString,
+    path: JString,
 ) -> jstring {
     let path: String = match env.get_string(&path) {
         Ok(value) => value.into(),
@@ -344,7 +403,7 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeDirectoryInfo(
 pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeFileInfo(
     mut env: JNIEnv,
     _class: JClass,
-    path: jni::objects::JString,
+    path: JString,
 ) -> jstring {
     let path: String = match env.get_string(&path) {
         Ok(value) => value.into(),
@@ -352,4 +411,16 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeFileInfo(
     };
 
     make_string(&mut env, file_info(&path))
+}
+
+// ==========================================
+// JNI: NETWORK MONITOR
+// ==========================================
+
+#[no_mangle]
+pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeNetworkInfo(
+    mut env: JNIEnv,
+    _class: JClass,
+) -> jstring {
+    make_string(&mut env, network_info())
 }
