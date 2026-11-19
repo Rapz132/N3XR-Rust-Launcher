@@ -1,7 +1,10 @@
+
 [package]
 name = "n3xr_core"
-version = "0.9.0"
+version = "1.0.0"
 edition = "2021"
+description = "N3XR Launcher Native Rust Core"
+license = "GPL-3.0"
 
 [lib]
 name = "n3xr_core"
