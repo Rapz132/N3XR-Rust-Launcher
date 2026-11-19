@@ -1,3 +1,4 @@
+
 /*
  * Zalith Launcher 2
  * Copyright (C) 2025-2026 MovTery <movtery228@qq.com> and contributors
@@ -22,6 +23,7 @@ import android.app.Application
 import android.content.res.Configuration
 import android.os.Process
 import android.util.Log
+import android.widget.Toast
 import coil3.ImageLoader
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
@@ -35,14 +37,12 @@ import coil3.svg.SvgDecoder
 import com.kyant.fishnet.Fishnet
 import com.movtery.zalithlauncher.context.GlobalContext
 import com.movtery.zalithlauncher.context.refreshContext
-import android.widget.Toast
-import com.n3xr.core.N3XRNative
 import com.movtery.zalithlauncher.coroutine.TaskSystem
 import com.movtery.zalithlauncher.game.account.AccountsManager
 import com.movtery.zalithlauncher.game.path.GamePathManager
 import com.movtery.zalithlauncher.keepalive.TaskKeepAlive
 import com.movtery.zalithlauncher.path.IMAGE_LOADER_CLIENT
-import com.movtery.zalithlauncher.path.PathManager
+import com.movtery.zalith.zalithlauncher.path.PathManager
 import com.movtery.zalithlauncher.setting.loadAllSettings
 import com.movtery.zalithlauncher.ui.activities.showFatalError
 import com.movtery.zalithlauncher.ui.activities.showLauncherCrash
@@ -50,6 +50,7 @@ import com.movtery.zalithlauncher.utils.device.Architecture
 import com.movtery.zalithlauncher.utils.logging.Logger
 import com.movtery.zalithlauncher.utils.network.TLSSecurity
 import com.movtery.zalithlauncher.utils.writeCrashFile
+import com.n3xr.core.N3XRNative
 import com.tencent.mmkv.MMKV
 import dagger.hilt.android.HiltAndroidApp
 import okio.Path.Companion.toOkioPath
@@ -57,6 +58,7 @@ import kotlin.properties.Delegates
 
 @HiltAndroidApp
 class ZLApplication : Application(), SingletonImageLoader.Factory {
+
     companion object {
         @JvmStatic
         var DEVICE_ARCHITECTURE by Delegates.notNull<Int>()
@@ -66,11 +68,11 @@ class ZLApplication : Application(), SingletonImageLoader.Factory {
         GlobalContext = this
         TLSSecurity.install()
         refreshContext(this)
-        //初始化任务保活控制器，需在任何任务开始前完成初始化
+
+        // Initialize task keep-alive controller
         TaskKeepAlive.initialize(this)
 
         Thread.setDefaultUncaughtExceptionHandler { _, th ->
-            //停止所有任务
             TaskSystem.stopAll()
 
             val throwable = if (th is SplashException) th.cause!!
@@ -82,7 +84,11 @@ class ZLApplication : Application(), SingletonImageLoader.Factory {
                 file = PathManager.FILE_CRASH_REPORT,
                 throwable = throwable
             ) { t ->
-                Logger.error("AppCrash", "An exception occurred while saving the crash report", t)
+                Logger.error(
+                    "AppCrash",
+                    "An exception occurred while saving the crash report",
+                    t
+                )
             }
 
             showLauncherCrash(this@ZLApplication, throwable, th !is SplashException)
@@ -90,7 +96,8 @@ class ZLApplication : Application(), SingletonImageLoader.Factory {
         }
 
         super.onCreate()
-        
+
+        // N3XR Rust JNI test
         testN3XRNative()
 
         runCatching {
@@ -102,21 +109,71 @@ class ZLApplication : Application(), SingletonImageLoader.Factory {
             Logger.initialize(this)
 
             initializeData()
+
             PathManager.DIR_FILES_PRIVATE = getDir("files", MODE_PRIVATE)
             DEVICE_ARCHITECTURE = Architecture.getDeviceArchitecture()
-            //Force x86 lib directory for Asus x86 based zenfones
+
+            // Force x86 lib directory for Asus x86 based zenfones
             if (Architecture.isx86Device() && Architecture.is32BitsDevice) {
                 val originalJNIDirectory = applicationInfo.nativeLibraryDir
-                applicationInfo.nativeLibraryDir = originalJNIDirectory.take(originalJNIDirectory.lastIndexOf("/")) + "/x86"
+                applicationInfo.nativeLibraryDir =
+                    originalJNIDirectory.take(
+                        originalJNIDirectory.lastIndexOf("/")
+                    ) + "/x86"
             }
         }.onFailure { launchTh ->
             writeCrashFile(
                 file = PathManager.FILE_CRASH_REPORT,
                 throwable = launchTh
             ) {
-                Log.w("ZLApplication", "An exception occurred while saving the crash report", it)
+                Log.w(
+                    "ZLApplication",
+                    "An exception occurred while saving the crash report",
+                    it
+                )
             }
+
             showFatalError(this, launchTh)
+        }
+    }
+
+    /**
+     * Test N3XR Rust native library.
+     */
+    private fun testN3XRNative() {
+        try {
+            if (!N3XRNative.isAvailable()) {
+                throw IllegalStateException(
+                    "Native library failed to load",
+                    N3XRNative.loadError()
+                )
+            }
+
+            val version = N3XRNative.nativeVersion()
+            val result = N3XRNative.nativeAdd(10, 20)
+
+            val message = """
+                N3XR Rust JNI: LOADED
+                Version: $version
+                10 + 20 = $result
+            """.trimIndent()
+
+            Log.i("N3XR-JNI", message)
+
+            Toast.makeText(
+                this,
+                message,
+                Toast.LENGTH_LONG
+            ).show()
+
+        } catch (error: Throwable) {
+            Log.e("N3XR-JNI", "Rust JNI test failed", error)
+
+            Toast.makeText(
+                this,
+                "N3XR Rust JNI FAILED: ${error.message}",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -130,14 +187,14 @@ class ZLApplication : Application(), SingletonImageLoader.Factory {
             .memoryCachePolicy(CachePolicy.ENABLED)
             .memoryCache {
                 MemoryCache.Builder()
-                    .maxSizeBytes(20L * 1024 * 1024) // 20MB
-                    .weakReferencesEnabled(true) //弱引用
+                    .maxSizeBytes(20L * 1024 * 1024)
+                    .weakReferencesEnabled(true)
                     .build()
             }
             .diskCachePolicy(CachePolicy.ENABLED)
             .diskCache {
                 DiskCache.Builder()
-                    .maxSizeBytes(512L * 1024 * 1024) // 512MB
+                    .maxSizeBytes(512L * 1024 * 1024)
                     .directory(PathManager.DIR_IMAGE_CACHE.toOkioPath())
                     .build()
             }
