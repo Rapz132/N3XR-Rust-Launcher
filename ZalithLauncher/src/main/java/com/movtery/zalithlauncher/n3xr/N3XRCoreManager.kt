@@ -5,92 +5,61 @@ import com.n3xr.core.N3XRNative
 
 object N3XRCoreManager {
 
-    fun isAvailable(): Boolean {
-        return N3XRNative.isAvailable()
-    }
+    fun isAvailable(): Boolean =
+        N3XRNative.isAvailable()
 
-    fun getVersion(): String {
-        return safeCall {
-            N3XRNative.nativeVersion()
-        }
-    }
+    fun getVersion(): String =
+        safeCall { N3XRNative.nativeVersion() } ?: "Unavailable"
 
-    fun getArchitecture(): String {
-        return safeCall {
-            N3XRNative.nativeArchitecture()
-        }
-    }
+    fun getArchitecture(): String =
+        safeCall { N3XRNative.nativeArchitecture() } ?: "Unavailable"
 
-    fun getOperatingSystem(): String {
-        return safeCall {
-            N3XRNative.nativeOperatingSystem()
-        }
-    }
+    fun getOperatingSystem(): String =
+        safeCall { N3XRNative.nativeOperatingSystem() } ?: "Unavailable"
 
-    fun getCpuThreads(): Int {
-        return safeCall {
-            N3XRNative.nativeCpuThreads()
-        } ?: -1
-    }
+    fun getCpuThreads(): Int =
+        safeCall { N3XRNative.nativeCpuThreads() } ?: -1
 
-    fun getCpuUsage(): Float {
-        return safeCall {
-            N3XRNative.nativeCpuUsagePercent()
-        } ?: -1f
-    }
+    fun getCpuUsage(): Float =
+        safeCall { N3XRNative.nativeCpuUsagePercent() } ?: -1f
 
-    fun getDeviceMemory(): String {
-        return safeCall {
-            N3XRNative.nativeDeviceMemoryInfo()
-        }
-    }
+    fun getDeviceMemory(): String =
+        safeCall { N3XRNative.nativeDeviceMemoryInfo() } ?: "Unavailable"
 
-    fun getProcessMemory(): String {
-        return safeCall {
-            N3XRNative.nativeProcessMemoryInfo()
-        }
-    }
+    fun getProcessMemory(): String =
+        safeCall { N3XRNative.nativeProcessMemoryInfo() } ?: "Unavailable"
 
-    fun getSystemReport(): String {
-        return safeCall {
-            N3XRNative.nativeSystemReport()
-        }
-    }
+    fun getSystemReport(): String =
+        safeCall { N3XRNative.nativeSystemReport() } ?: "Unavailable"
 
-    fun getNetworkInfo(): String {
-        return safeCall {
-            N3XRNative.nativeNetworkInfo()
-        }
-    }
+    fun getNetworkInfo(): String =
+        safeCall { N3XRNative.nativeNetworkInfo() } ?: "Unavailable"
 
     fun inspectDirectory(path: String): String {
         if (path.isBlank()) return "Invalid directory path"
-
         return safeCall {
             N3XRNative.nativeDirectoryInfo(path)
-        }
+        } ?: "Unavailable"
     }
 
     fun inspectFile(path: String): String {
         if (path.isBlank()) return "Invalid file path"
-
         return safeCall {
             N3XRNative.nativeFileInfo(path)
-        }
+        } ?: "Unavailable"
     }
 
-    fun add(a: Int, b: Int): Int {
-        return safeCall {
-            N3XRNative.nativeAdd(a, b)
-        } ?: 0
-    }
+    fun getHealthCheck(): String =
+        safeCall { N3XRNative.nativeHealthCheck() } ?: "Unavailable"
 
-    private fun <T> safeCall(
-        action: () -> T
-    ): T? {
-        if (!N3XRNative.isAvailable()) {
-            return null
-        }
+    fun getDiagnostics(): String =
+        safeCall { N3XRNative.nativeDiagnostics() } ?: "Unavailable"
+
+    fun add(a: Int, b: Int): Int =
+        safeCall { N3XRNative.nativeAdd(a, b) } ?: 0
+
+    private fun <T> safeCall(action: () -> T): T? {
+        if (!N3XRNative.isAvailable()) return null
 
         return try {
             action()
