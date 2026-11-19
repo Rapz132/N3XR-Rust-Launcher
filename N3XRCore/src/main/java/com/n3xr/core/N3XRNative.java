@@ -30,12 +30,10 @@ public final class N3XRNative {
     }
 
     public static native String nativeVersion();
-
     public static native int nativeAdd(int a, int b);
-
     public static native String nativeArchitecture();
-
     public static native String nativeOperatingSystem();
-
     public static native int nativeCpuThreads();
+    public static native String nativeDeviceMemoryInfo();
+    public static native String nativeProcessMemoryInfo();
 }
