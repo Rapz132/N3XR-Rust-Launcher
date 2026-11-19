@@ -18,6 +18,7 @@ fn make_string(env: &mut JNIEnv, value: String) -> jstring {
 fn read_cpu() -> Option<(u64, u64)> {
     let content = fs::read_to_string("/proc/stat").ok()?;
     let line = content.lines().next()?;
+
     let values: Vec<u64> = line
         .split_whitespace()
         .skip(1)
@@ -53,7 +54,8 @@ fn cpu_usage() -> f32 {
             -1.0
         } else {
             ((total_diff.saturating_sub(idle_diff)) as f32
-                / total_diff as f32 * 100.0)
+                / total_diff as f32
+                * 100.0)
                 .clamp(0.0, 100.0)
         }
     } else {
@@ -166,7 +168,7 @@ fn file_info(path: &str) -> String {
 
 fn system_report() -> String {
     format!(
-        "N3XR Rust Core 0.9.0\nArchitecture: {}\nOS: {}\nCPU threads: {}\nCPU usage: {:.2}%\n\nDevice memory:\n{}\n\nProcess memory:\n{}\n\nNetwork:\n{}",
+        "N3XR Rust Core 1.0.0\nArchitecture: {}\nOS: {}\nCPU threads: {}\nCPU usage: {:.2}%\n\nDevice memory:\n{}\n\nProcess memory:\n{}\n\nNetwork:\n{}",
         std::env::consts::ARCH,
         std::env::consts::OS,
         std::thread::available_parallelism()
@@ -185,7 +187,7 @@ fn health_check() -> String {
     let proc_net = Path::new("/proc/net/dev").exists();
 
     format!(
-        "N3XR Rust Core Health Check\nVersion: 0.9.0\nArchitecture: {}\nOS: {}\n/proc/stat: {}\n/proc/meminfo: {}\n/proc/net/dev: {}\nStatus: {}",
+        "N3XR Rust Core Health Check\nVersion: 1.0.0\nArchitecture: {}\nOS: {}\n/proc/stat: {}\n/proc/meminfo: {}\n/proc/net/dev: {}\nStatus: {}",
         std::env::consts::ARCH,
         std::env::consts::OS,
         if proc_stat { "OK" } else { "UNAVAILABLE" },
@@ -196,11 +198,7 @@ fn health_check() -> String {
 }
 
 fn diagnostics() -> String {
-    format!(
-        "{}\n\n{}",
-        health_check(),
-        system_report()
-    )
+    format!("{}\n\n{}", health_check(), system_report())
 }
 
 #[no_mangle]
@@ -208,7 +206,7 @@ pub extern "system" fn Java_com_n3xr_core_N3XRNative_nativeVersion(
     mut env: JNIEnv,
     _class: JClass,
 ) -> jstring {
-    make_string(&mut env, "N3XR Rust Core 0.9.0".to_string())
+    make_string(&mut env, "N3XR Rust Core 1.0.0".to_string())
 }
 
 #[no_mangle]
