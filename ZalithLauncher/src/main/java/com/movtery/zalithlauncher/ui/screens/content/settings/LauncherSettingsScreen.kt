@@ -768,19 +768,29 @@ private fun CustomBackground(
             )
         }
 
-        AnimatedVisibility(
+        Row(
             modifier = Modifier.padding(horizontal = 16.dp),
-            visible = backgroundViewModel.isValid
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
+            //Tombol Pilih gambar/video
             IconTextButton(
-                painter = painterResource(R.drawable.ic_restart_alt),
-                text = stringResource(R.string.generic_reset),
-                onClick = {
-                    if (operation == BackgroundOperation.None) {
-                        operation = BackgroundOperation.PreReset
-                    }
-                }
+                painter = painterResource(R.drawable.ic_add),
+                text = "Pilih",
+                onClick = { filePicker.launch(Unit) }
             )
+
+            AnimatedVisibility(visible = backgroundViewModel.isValid) {
+                IconTextButton(
+                    painter = painterResource(R.drawable.ic_restart_alt),
+                    text = stringResource(R.string.generic_reset),
+                    onClick = {
+                        if (operation == BackgroundOperation.None) {
+                            operation = BackgroundOperation.PreReset
+                        }
+                    }
+                )
+            }
         }
     }
 }
