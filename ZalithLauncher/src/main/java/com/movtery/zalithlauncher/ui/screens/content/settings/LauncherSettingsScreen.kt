@@ -323,6 +323,28 @@ fun LauncherSettingsScreen(
                 }
             }
 
+            //Warna/gradient background (dipakai kalau tidak ada gambar/video)
+            AnimatedItem { ctx ->
+                SettingsCardColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animated(ctx)
+                ) {
+                    SettingsCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        position = CardPosition.Top
+                    ) {
+                        BackgroundColorMode(modifier = Modifier.fillMaxWidth())
+                    }
+                    SettingsCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        position = CardPosition.Bottom
+                    ) {
+                        BackgroundColorPickers(modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+
             //动画设置板块
             AnimatedItem { ctx ->
                 SettingsCardColumn(
@@ -820,6 +842,92 @@ private fun BackgroundOperation(
                 backgroundViewModel.delete()
                 changeOperation(BackgroundOperation.None)
             }
+        }
+    }
+}
+
+@Composable
+private fun BackgroundColorMode(modifier: Modifier = Modifier) {
+    val mode = LauncherSettings.backgroundColorMode.state
+    Column(
+        modifier = modifier.padding(all = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        TitleAndSummary(
+            title = "Warna background",
+            summary = "Dipakai kalau tidak ada gambar atau video"
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf("Mati", "Polos", "Gradient").forEachIndexed { index, label ->
+                if (mode == index) {
+                    Button(onClick = { LauncherSettings.backgroundColorMode.save(index) }) {
+                        Text(text = label)
+                    }
+                } else {
+                    FilledTonalButton(onClick = { LauncherSettings.backgroundColorMode.save(index) }) {
+                        Text(text = label)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackgroundColorPickers(modifier: Modifier = Modifier) {
+    val mode = LauncherSettings.backgroundColorMode.state
+    Column(
+        modifier = modifier.padding(all = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (mode == 0) {
+            Text(
+                text = "Pilih mode Polos atau Gradient untuk mengatur warna",
+                style = MaterialTheme.typography.labelMedium
+            )
+        } else {
+            BackgroundColorRow(
+                label = "Warna 1",
+                initial = LauncherSettings.backgroundColorStart.state,
+                onSave = { LauncherSettings.backgroundColorStart.save(it) }
+            )
+            if (mode == 2) {
+                BackgroundColorRow(
+                    label = "Warna 2",
+                    initial = LauncherSettings.backgroundColorEnd.state,
+                    onSave = { LauncherSettings.backgroundColorEnd.save(it) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackgroundColorRow(
+    label: String,
+    initial: Int,
+    onSave: (Int) -> Unit
+) {
+    val controller = rememberColorPickerController(initialColor = Color(initial))
+    val current by remember(controller) { controller.color }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(text = label, style = MaterialTheme.typography.labelMedium)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            HueBarPicker(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(30.dp),
+                controller = controller,
+                onChangeFinished = { onSave(current.toArgb()) }
+            )
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .background(color = current)
+            )
         }
     }
 }
