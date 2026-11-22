@@ -111,6 +111,22 @@ object LauncherSettings : SettingsRegistry() {
     val backgroundBlurType = enumSetting("backgroundBlurType", BackgroundBlur.Background)
 
     /**
+     * Mode warna background (dipakai kalau tidak ada gambar/video):
+     * 0 = mati (bawaan), 1 = warna polos, 2 = gradient
+     */
+    val backgroundColorMode = intSetting("backgroundColorMode", 0, 0..2)
+
+    /**
+     * Warna pertama (ARGB) untuk mode polos dan gradient
+     */
+    val backgroundColorStart = intSetting("backgroundColorStart", Color(0xFF1B1B2F).toArgb())
+
+    /**
+     * Warna kedua (ARGB) untuk mode gradient
+     */
+    val backgroundColorEnd = intSetting("backgroundColorEnd", Color(0xFF3A1C71).toArgb())
+
+    /**
      * 启动器日志保留天数
      */
     val launcherLogRetentionDays = intSetting("launcherLogRetentionDays", 7, 1..14)
