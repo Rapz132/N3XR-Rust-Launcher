@@ -99,6 +99,7 @@ import com.movtery.zalithlauncher.ui.screens.NestedNavKey
 import com.movtery.zalithlauncher.ui.screens.NormalNavKey
 import com.movtery.zalithlauncher.ui.screens.TitledNavKey
 import com.movtery.zalithlauncher.ui.screens.content.AccountManageScreen
+import com.movtery.zalithlauncher.ui.screens.content.ChatDialog
 import com.movtery.zalithlauncher.ui.screens.content.DownloadScreen
 import com.movtery.zalithlauncher.ui.screens.content.FileSelectorScreen
 import com.movtery.zalithlauncher.ui.screens.content.LauncherScreen
@@ -151,6 +152,7 @@ fun MainScreen(
     }
 
     val isTaskMenuExpanded = LauncherSettings.launcherTaskMenuExpanded.state
+    var showChat by remember { mutableStateOf(false) }
 
     fun changeTasksExpandedState() {
         LauncherSettings.launcherTaskMenuExpanded.save(!isTaskMenuExpanded)
@@ -196,6 +198,10 @@ fun MainScreen(
             modifier = Modifier
                 .fillMaxSize()
         ) {
+            if (showChat) {
+                ChatDialog(onDismiss = { showChat = false })
+            }
+
             TopBar(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -231,6 +237,7 @@ fun MainScreen(
                         )
                     )
                 },
+                openChat = { showChat = true },
                 changeExpandedState = {
                     changeTasksExpandedState()
                 },
@@ -282,6 +289,7 @@ private fun <E: TitledNavKey> TopBar(
     toDownloadScreen: () -> Unit,
     toMultiplayerScreen: () -> Unit,
     openFileManager: () -> Unit,
+    openChat: () -> Unit,
     changeExpandedState: () -> Unit,
 ) {
     val festivals = LocalFestivals.current
@@ -434,6 +442,15 @@ private fun <E: TitledNavKey> TopBar(
                             contentDescription = stringResource(R.string.main_task_menu)
                         )
                     }
+                }
+
+                IconButton(
+                    onClick = openChat
+                ) {
+                    Text(
+                        text = "Chat",
+                        style = MaterialTheme.typography.labelMedium
+                    )
                 }
 
                 IconButton(
