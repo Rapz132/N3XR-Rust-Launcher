@@ -28,21 +28,28 @@ val defaultOAuthClientID = project.findProperty("oauth_client_id") as? String
 val defaultStorePassword = project.findProperty("default_store_password") as? String ?: error("The \"default_store_password\" property is not set in gradle.properties.")
 val defaultKeyPassword = project.findProperty("default_key_password") as? String ?: error("The \"default_key_password\" property is not set in gradle.properties.")
 val defaultCurseForgeApiKey = project.findProperty("curseforge_api_key") as? String
-val supabaseUrl = getKeyFromLocal("SUPABASE_URL", ".supabase_url.txt", project.findProperty("supabase_url") as? String)
-val supabaseKey = getKeyFromLocal("SUPABASE_KEY", ".supabase_key.txt", project.findProperty("supabase_key") as? String)
+val defaultSupabaseUrl = project.findProperty("supabase_url") as? String
+val defaultSupabaseKey = project.findProperty("supabase_key") as? String
 
 val projectArch: String = System.getProperty("arch", "all")
 
+/**
+ * Urutan: env var -> file lokal -> default. Nilai dipangkas (trim) dan nilai kosong dianggap tidak ada,
+ * jadi secret GitHub yang kosong atau ada spasi/enter di ujung tidak lagi merusak hasilnya.
+ */
 fun getKeyFromLocal(envKey: String, fileName: String? = null, default: String? = null): String {
-    val key = System.getenv(envKey)
+    val key = System.getenv(envKey)?.trim()?.takeIf { it.isNotEmpty() }
     return key ?: fileName?.let {
         val file = File(rootDir, fileName)
-        if (file.canRead() && file.isFile) file.readText() else null
-    } ?: default ?: run {
+        if (file.canRead() && file.isFile) file.readText().trim().takeIf { text -> text.isNotEmpty() } else null
+    } ?: default?.trim()?.takeIf { it.isNotEmpty() } ?: run {
         logger.warn("BUILD: $envKey not set; related features may throw exceptions.")
         ""
     }
 }
+
+val supabaseUrl = getKeyFromLocal("SUPABASE_URL", ".supabase_url.txt", defaultSupabaseUrl)
+val supabaseKey = getKeyFromLocal("SUPABASE_KEY", ".supabase_key.txt", defaultSupabaseKey)
 
 fun File.sha1Hex(): String {
     val digest = MessageDigest.getInstance("SHA-1")
@@ -138,6 +145,8 @@ android {
         versionCode = launcherVersionCode
         versionName = launcherVersionName
         manifestPlaceholders["launcher_name"] = launcherAPPName
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_KEY", "\"$supabaseKey\"")
     }
 
     buildTypes {
