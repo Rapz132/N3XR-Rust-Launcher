@@ -28,6 +28,8 @@ val defaultOAuthClientID = project.findProperty("oauth_client_id") as? String
 val defaultStorePassword = project.findProperty("default_store_password") as? String ?: error("The \"default_store_password\" property is not set in gradle.properties.")
 val defaultKeyPassword = project.findProperty("default_key_password") as? String ?: error("The \"default_key_password\" property is not set in gradle.properties.")
 val defaultCurseForgeApiKey = project.findProperty("curseforge_api_key") as? String
+val supabaseUrl = getKeyFromLocal("SUPABASE_URL", ".supabase_url.txt", project.findProperty("supabase_url") as? String)
+val supabaseKey = getKeyFromLocal("SUPABASE_KEY", ".supabase_key.txt", project.findProperty("supabase_key") as? String)
 
 val projectArch: String = System.getProperty("arch", "all")
 
