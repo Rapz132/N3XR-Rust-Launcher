@@ -108,7 +108,7 @@ fun SettingsScreen(
     }
 }
 
-private val settingItems = listOf(
+val settingItems = listOf(
     CategoryItem(NormalNavKey.Settings.Renderer, { CategoryIcon(R.drawable.ic_video_settings, R.string.settings_tab_renderer) }, R.string.settings_tab_renderer),
     CategoryItem(NormalNavKey.Settings.Game, { CategoryIcon(R.drawable.ic_rocket_launch_filled, R.string.settings_tab_game) }, R.string.settings_tab_game),
     CategoryItem(NormalNavKey.Settings.Control, { CategoryIcon(R.drawable.ic_videogame_asset_outlined, R.string.settings_tab_control) }, R.string.settings_tab_control),
@@ -120,10 +120,11 @@ private val settingItems = listOf(
 )
 
 @Composable
-private fun TabMenu(
+fun TabMenu(
     modifier: Modifier = Modifier,
     isVisible: Boolean,
     settingsScreenKey: TitledNavKey?,
+    items: List<CategoryItem> = settingItems,
     navigateTo: (TitledNavKey) -> Unit
 ) {
     val ctx = rememberAnimatedContext(isVisible = isVisible)
@@ -139,7 +140,7 @@ private fun TabMenu(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(12.dp))
-        settingItems.forEach { item ->
+        items.forEach { item ->
             if (item.division) {
                 HorizontalDivider(
                     modifier = Modifier
