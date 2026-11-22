@@ -27,6 +27,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -61,8 +62,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
@@ -103,12 +106,14 @@ import com.movtery.zalithlauncher.ui.screens.content.LicenseScreen
 import com.movtery.zalithlauncher.ui.screens.content.LogViewScreen
 import com.movtery.zalithlauncher.ui.screens.content.MultiplayerScreen
 import com.movtery.zalithlauncher.ui.screens.content.SettingsScreen
+import com.movtery.zalithlauncher.ui.screens.content.TabMenu
 import com.movtery.zalithlauncher.ui.screens.content.VersionExportScreen
 import com.movtery.zalithlauncher.ui.screens.content.VersionSettingsScreen
 import com.movtery.zalithlauncher.ui.screens.content.VersionsManageScreen
 import com.movtery.zalithlauncher.ui.screens.content.WebViewScreen
 import com.movtery.zalithlauncher.ui.screens.content.addoninfo.AddonInfoScreen
 import com.movtery.zalithlauncher.ui.screens.content.navigateToDownload
+import com.movtery.zalithlauncher.ui.screens.navigateOnce
 import com.movtery.zalithlauncher.ui.screens.navigateTo
 import com.movtery.zalithlauncher.ui.screens.onBack
 import com.movtery.zalithlauncher.ui.screens.rememberTransitionSpec
@@ -126,8 +131,6 @@ import com.movtery.zalithlauncher.viewmodel.ModpackImportViewModel
 import com.movtery.zalithlauncher.viewmodel.ScreenBackStackViewModel
 import com.movtery.zalithlauncher.viewmodel.sendKeepScreen
 import com.movtery.zalithlauncher.viewmodel.sendToast
-import com.movtery.zalithlauncher.ui.screens.content.TabMenu
-import com.movtery.zalithlauncher.ui.screens.navigateOnce
 
 @Composable
 fun MainScreen(
@@ -168,9 +171,25 @@ fun MainScreen(
         backgroundColor().copy(alpha = launcherBackgroundOpacity)
     } else backgroundColor()
 
+    //Warna/gradient background, hanya dipakai kalau tidak ada gambar/video
+    val colorMode = LauncherSettings.backgroundColorMode.state
+    val useColorBackground = !isBackgroundValid && colorMode != 0
+    val colorBrush: Brush = if (colorMode == 2) {
+        Brush.verticalGradient(
+            listOf(
+                Color(LauncherSettings.backgroundColorStart.state),
+                Color(LauncherSettings.backgroundColorEnd.state)
+            )
+        )
+    } else {
+        SolidColor(Color(LauncherSettings.backgroundColorStart.state))
+    }
+
     Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = backgroundColor,
+        modifier = Modifier
+            .fillMaxSize()
+            .then(if (useColorBackground) Modifier.background(colorBrush) else Modifier),
+        color = if (useColorBackground) Color.Transparent else backgroundColor,
         contentColor = onBackgroundColor()
     ) {
         Column(
@@ -537,32 +556,53 @@ private fun NavigationUI(
             popTransitionSpec = rememberTransitionSpec(),
             entryProvider = entryProvider {
                 entry<NormalNavKey.LauncherMain> {
-                    LauncherScreen(
-                        backStackViewModel = screenBackStackModel,
-                        navigateToVersions = navigateToVersions,
-                        onLaunchGame = { version ->
-                            eventViewModel.sendEvent(
-                                EventViewModel.Event.Launch.Game(version)
-                            )
-                        },
-                        onQuickPlayServer = { version, address ->
-                            val target = (version ?: VersionsManager.currentVersion.value)?.takeIf { it.isValid() }
-                            if (target != null) {
-                                eventViewModel.sendEvent(
-                                    EventViewModel.Event.Launch.PlayServer(target, address)
+                    //Menu pengaturan permanen di kiri + isi home di kanan
+                    Row(modifier = Modifier.fillMaxSize()) {
+                        TabMenu(
+                            modifier = Modifier.fillMaxHeight(),
+                            isVisible = true,
+                            settingsScreenKey = null,
+                            navigateTo = { settingKey ->
+                                screenBackStackModel.mainScreen.removeAndNavigateTo(
+                                    removes = screenBackStackModel.clearBeforeNavKeys,
+                                    screenKey = screenBackStackModel.settingsScreen
                                 )
-                            } else {
-                                eventViewModel.sendToast(androidText(R.string.game_launch_no_version))
-                                screenBackStackModel.mainScreen.navigateTo(NormalNavKey.VersionsManager)
+                                screenBackStackModel.settingsScreen.backStack.navigateOnce(settingKey)
                             }
-                        },
-                        onOpenLink = {
-                            eventViewModel.sendEvent(EventViewModel.Event.OpenLink(it))
-                        },
-                        startGuideOnce = { keys ->
-                            eventViewModel.sendStartGuideOnce(keys)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                        ) {
+                            LauncherScreen(
+                                backStackViewModel = screenBackStackModel,
+                                navigateToVersions = navigateToVersions,
+                                onLaunchGame = { version ->
+                                    eventViewModel.sendEvent(
+                                        EventViewModel.Event.Launch.Game(version)
+                                    )
+                                },
+                                onQuickPlayServer = { version, address ->
+                                    val target = (version ?: VersionsManager.currentVersion.value)?.takeIf { it.isValid() }
+                                    if (target != null) {
+                                        eventViewModel.sendEvent(
+                                            EventViewModel.Event.Launch.PlayServer(target, address)
+                                        )
+                                    } else {
+                                        eventViewModel.sendToast(androidText(R.string.game_launch_no_version))
+                                        screenBackStackModel.mainScreen.navigateTo(NormalNavKey.VersionsManager)
+                                    }
+                                },
+                                onOpenLink = {
+                                    eventViewModel.sendEvent(EventViewModel.Event.OpenLink(it))
+                                },
+                                startGuideOnce = { keys ->
+                                    eventViewModel.sendStartGuideOnce(keys)
+                                }
+                            )
                         }
-                    )
+                    }
                 }
                 entry<NestedNavKey.Settings> { key ->
                     SettingsScreen(
