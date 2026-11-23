@@ -21,11 +21,13 @@ package com.movtery.zalithlauncher.ui.screens.main
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -573,20 +575,50 @@ private fun NavigationUI(
             popTransitionSpec = rememberTransitionSpec(),
             entryProvider = entryProvider {
                 entry<NormalNavKey.LauncherMain> {
-                    //Menu pengaturan permanen di kiri + isi home di kanan
+                    //Menu pengaturan di kiri (bisa dibuka/ditutup) + isi home di kanan
+                    val homeMenuExpanded = LauncherSettings.launcherHomeMenuExpanded.state
                     Row(modifier = Modifier.fillMaxSize()) {
-                        TabMenu(
-                            modifier = Modifier.fillMaxHeight(),
-                            isVisible = true,
-                            settingsScreenKey = null,
-                            navigateTo = { settingKey ->
-                                screenBackStackModel.mainScreen.removeAndNavigateTo(
-                                    removes = screenBackStackModel.clearBeforeNavKeys,
-                                    screenKey = screenBackStackModel.settingsScreen
+                        AnimatedVisibility(
+                            visible = homeMenuExpanded,
+                            enter = expandHorizontally() + fadeIn(),
+                            exit = shrinkHorizontally() + fadeOut()
+                        ) {
+                            TabMenu(
+                                modifier = Modifier.fillMaxHeight(),
+                                isVisible = true,
+                                settingsScreenKey = null,
+                                navigateTo = { settingKey ->
+                                    screenBackStackModel.mainScreen.removeAndNavigateTo(
+                                        removes = screenBackStackModel.clearBeforeNavKeys,
+                                        screenKey = screenBackStackModel.settingsScreen
+                                    )
+                                    screenBackStackModel.settingsScreen.backStack.navigateOnce(settingKey)
+                                }
+                            )
+                        }
+                        //Tombol buka/tutup menu
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(32.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            IconButton(
+                                modifier = Modifier.size(32.dp),
+                                onClick = {
+                                    LauncherSettings.launcherHomeMenuExpanded.save(!homeMenuExpanded)
+                                }
+                            ) {
+                                Icon(
+                                    modifier = Modifier.size(28.dp),
+                                    painter = painterResource(
+                                        if (homeMenuExpanded) R.drawable.ic_arrow_left_rounded
+                                        else R.drawable.ic_arrow_right_rounded
+                                    ),
+                                    contentDescription = if (homeMenuExpanded) "Tutup menu" else "Buka menu"
                                 )
-                                screenBackStackModel.settingsScreen.backStack.navigateOnce(settingKey)
                             }
-                        )
+                        }
                         Box(
                             modifier = Modifier
                                 .weight(1f)
