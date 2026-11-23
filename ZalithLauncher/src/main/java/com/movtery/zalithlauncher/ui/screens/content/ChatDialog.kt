@@ -1,16 +1,23 @@
 package com.movtery.zalithlauncher.ui.screens.content
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -30,17 +37,25 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -48,17 +63,26 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.movtery.zalithlauncher.R
 import com.movtery.zalithlauncher.chat.ChatManager
+import com.movtery.zalithlauncher.chat.ChatMedia
 import com.movtery.zalithlauncher.chat.ChatMessage
+import com.movtery.zalithlauncher.chat.ChatMessageType
 import com.movtery.zalithlauncher.chat.ChatState
+import com.movtery.zalithlauncher.chat.VoicePlayer
+import com.movtery.zalithlauncher.chat.VoiceRecorder
 import com.movtery.zalithlauncher.game.account.AccountsManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 private val OnlineGreen = Color(0xFF3DDC84)
+private val RecordRed = Color(0xFFE5484D)
 
 @Composable
 fun ChatDialog(onDismiss: () -> Unit) {
@@ -130,7 +154,6 @@ private fun JoinContent(playerName: String, onClose: () -> Unit) {
                 .fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Buat grup
             Surface(
                 modifier = Modifier
                     .weight(1f)
@@ -162,7 +185,6 @@ private fun JoinContent(playerName: String, onClose: () -> Unit) {
                 }
             }
 
-            // Gabung grup
             Surface(
                 modifier = Modifier
                     .weight(1f)
@@ -220,7 +242,7 @@ private fun JoinContent(playerName: String, onClose: () -> Unit) {
         }
 
         Text(
-            text = "Pesan tidak disimpan dan hilang saat kamu keluar.",
+            text = "Pesan, foto, dan suara tidak disimpan dan hilang saat kamu keluar.",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -233,6 +255,9 @@ private fun JoinContent(playerName: String, onClose: () -> Unit) {
 
 @Composable
 private fun RoomContent(code: String, onClose: () -> Unit) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+
     val state by ChatManager.state.collectAsStateWithLifecycle()
     val messages by ChatManager.messages.collectAsStateWithLifecycle()
     val error by ChatManager.error.collectAsStateWithLifecycle()
@@ -241,6 +266,19 @@ private fun RoomContent(code: String, onClose: () -> Unit) {
 
     var input by remember { mutableStateOf("") }
     var copied by remember { mutableStateOf(false) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    var previewMedia by remember { mutableStateOf<String?>(null) }
+    var recordingSince by remember { mutableLongStateOf(0L) }
+    var playingId by remember { mutableStateOf<String?>(null) }
+
+    val recorder = remember { VoiceRecorder(context) }
+    val player = remember { VoicePlayer(context) { playingId = it } }
+    DisposableEffect(Unit) {
+        onDispose {
+            recorder.cancel()
+            player.release()
+        }
+    }
 
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
@@ -257,15 +295,78 @@ private fun RoomContent(code: String, onClose: () -> Unit) {
             copied = false
         }
     }
+    LaunchedEffect(notice) {
+        if (notice != null) {
+            delay(2500)
+            notice = null
+        }
+    }
 
     val listState = rememberLazyListState()
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
     }
 
-    val canSend = state == ChatState.Connected && remainingSec == 0L && input.isNotBlank()
+    val connected = state == ChatState.Connected
+    val recording = recordingSince > 0L
+    val canSend = connected && remainingSec == 0L && input.isNotBlank()
+
     val send: () -> Unit = {
         if (canSend && ChatManager.sendMessage(input)) input = ""
+    }
+
+    // --- Pesan suara ---
+    val finishRecording: (Boolean) -> Unit = { shouldSend ->
+        recordingSince = 0L
+        if (shouldSend) {
+            val result = recorder.stop()
+            if (result == null) {
+                notice = "Rekaman terlalu pendek."
+            } else if (!ChatManager.sendAudio(result.base64, result.durationMs)) {
+                notice = "Tunggu sebentar sebelum mengirim lagi."
+            }
+        } else {
+            recorder.cancel()
+        }
+    }
+    val startRecording: () -> Unit = {
+        player.stop()
+        if (recorder.start()) {
+            recordingSince = System.currentTimeMillis()
+        } else {
+            notice = "Gagal mulai merekam."
+        }
+    }
+    val micPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startRecording() else notice = "Izin mikrofon ditolak."
+    }
+    val onMicClick: () -> Unit = {
+        val granted = context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        if (granted) startRecording() else micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+    }
+    LaunchedEffect(now) {
+        if (recordingSince > 0L && now - recordingSince >= ChatManager.MAX_AUDIO_MS) {
+            finishRecording(true)
+        }
+    }
+
+    // --- Foto ---
+    val imageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            scope.launch {
+                val base64 = withContext(Dispatchers.IO) { ChatMedia.encodeImage(context, uri) }
+                if (base64 == null) {
+                    notice = "Gagal memproses foto."
+                } else if (!ChatManager.sendImage(base64)) {
+                    notice = "Tunggu sebentar sebelum mengirim lagi."
+                }
+            }
+        }
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -315,7 +416,6 @@ private fun RoomContent(code: String, onClose: () -> Unit) {
                 }
             }
 
-            // Chip kode grup (klik untuk salin)
             Surface(
                 modifier = Modifier
                     .clip(CircleShape)
@@ -366,61 +466,113 @@ private fun RoomContent(code: String, onClose: () -> Unit) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 state = listState,
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 20.dp,
-                    vertical = 10.dp
-                ),
+                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(messages, key = { it.id }) { message ->
-                    MessageItem(message)
+                    MessageItem(
+                        message = message,
+                        playing = playingId == message.id,
+                        onPlay = { message.media?.let { player.toggle(message.id, it) } },
+                        onOpenImage = { previewMedia = it }
+                    )
                 }
             }
         }
 
-        // Kolom input
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            OutlinedTextField(
-                modifier = Modifier.weight(1f),
-                value = input,
-                onValueChange = { input = it.take(300) },
-                placeholder = { Text("Tulis pesan...") },
-                singleLine = true,
-                shape = RoundedCornerShape(28.dp),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { send() }),
-                trailingIcon = {
-                    if (input.length > 240) {
-                        Text(
-                            modifier = Modifier.padding(end = 12.dp),
-                            text = "${input.length}/300",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+        notice?.let {
+            Text(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+                text = it,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.error
             )
-            Button(
-                modifier = Modifier.height(52.dp),
-                enabled = canSend,
-                onClick = send
+        }
+
+        // Area input
+        if (recording) {
+            val elapsed = (now - recordingSince).coerceAtLeast(0L)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(if (remainingSec > 0) "Kirim ($remainingSec)" else "Kirim")
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(RecordRed)
+                )
+                Text(
+                    modifier = Modifier.weight(1f),
+                    text = "Merekam ${formatDuration(elapsed)} / ${formatDuration(ChatManager.MAX_AUDIO_MS)}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                OutlinedButton(onClick = { finishRecording(false) }) { Text("Batal") }
+                Button(onClick = { finishRecording(true) }) { Text("Kirim") }
+            }
+        } else {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                EmojiButton("📷", enabled = connected) { imageLauncher.launch("image/*") }
+                EmojiButton("🎤", enabled = connected, onClick = onMicClick)
+
+                OutlinedTextField(
+                    modifier = Modifier.weight(1f),
+                    value = input,
+                    onValueChange = { input = it.take(300) },
+                    placeholder = { Text("Tulis pesan...") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(28.dp),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = { send() }),
+                    trailingIcon = {
+                        if (input.length > 240) {
+                            Text(
+                                modifier = Modifier.padding(end = 12.dp),
+                                text = "${input.length}/300",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.size(6.dp))
+                Button(
+                    modifier = Modifier.height(52.dp),
+                    enabled = canSend,
+                    onClick = send
+                ) {
+                    Text(if (remainingSec > 0) "Kirim ($remainingSec)" else "Kirim")
+                }
             }
         }
+    }
+
+    previewMedia?.let { media ->
+        ImagePreview(media = media, onDismiss = { previewMedia = null })
     }
 }
 
 /* ---------------------------------------------------------------- */
 /*  Komponen kecil                                                   */
 /* ---------------------------------------------------------------- */
+
+private fun formatDuration(ms: Long): String {
+    val total = (ms / 1000).toInt().coerceAtLeast(0)
+    return "%d:%02d".format(total / 60, total % 60)
+}
 
 @Composable
 private fun CloseButton(onClick: () -> Unit) {
@@ -434,14 +586,25 @@ private fun CloseButton(onClick: () -> Unit) {
 }
 
 @Composable
+private fun EmojiButton(emoji: String, enabled: Boolean, onClick: () -> Unit) {
+    IconButton(onClick = onClick, enabled = enabled) {
+        Text(
+            modifier = Modifier.alpha(if (enabled) 1f else 0.4f),
+            text = emoji,
+            fontSize = 22.sp
+        )
+    }
+}
+
+@Composable
 private fun Avatar(name: String, size: Int = 32) {
-    val hue = remember(name) { (name.hashCode().toLong().and(0x7fffffff) % 360).toFloat() }
-    val bg = remember(hue) { Color.hsv(hue, 0.45f, 0.65f) }
+    val hue = remember(name) { (name.hashCode().toLong().and(0x7fffffffL) % 360L).toFloat() }
+    val background = remember(hue) { Color.hsv(hue, 0.45f, 0.65f) }
     Box(
         modifier = Modifier
             .size(size.dp)
             .clip(CircleShape)
-            .background(bg),
+            .background(background),
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -454,7 +617,42 @@ private fun Avatar(name: String, size: Int = 32) {
 }
 
 @Composable
-private fun MessageItem(message: ChatMessage) {
+private fun ImagePreview(media: String, onDismiss: () -> Unit) {
+    val bitmap by produceState<ImageBitmap?>(null, media) {
+        value = withContext(Dispatchers.IO) { ChatMedia.decodeImage(media)?.asImageBitmap() }
+    }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.88f))
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center
+        ) {
+            bitmap?.let {
+                Image(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    bitmap = it,
+                    contentDescription = null,
+                    contentScale = ContentScale.Fit
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun MessageItem(
+    message: ChatMessage,
+    playing: Boolean,
+    onPlay: () -> Unit,
+    onOpenImage: (String) -> Unit
+) {
     if (message.isSystem) {
         Box(
             modifier = Modifier.fillMaxWidth(),
@@ -529,12 +727,106 @@ private fun MessageItem(message: ChatMessage) {
                 contentColor = if (mine) MaterialTheme.colorScheme.onPrimaryContainer
                 else MaterialTheme.colorScheme.onSurface
             ) {
+                when (message.type) {
+                    ChatMessageType.Text -> Text(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
+                        text = message.text,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+
+                    ChatMessageType.Image -> ImageBubble(
+                        media = message.media,
+                        onClick = { message.media?.let(onOpenImage) }
+                    )
+
+                    ChatMessageType.Audio -> AudioBubble(
+                        playing = playing,
+                        durationMs = message.durationMs,
+                        onPlay = onPlay
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageBubble(media: String?, onClick: () -> Unit) {
+    val bitmap by produceState<ImageBitmap?>(null, media) {
+        value = withContext(Dispatchers.IO) { media?.let { ChatMedia.decodeImage(it)?.asImageBitmap() } }
+    }
+    val shape = RoundedCornerShape(14.dp)
+    val loaded = bitmap
+    Box(modifier = Modifier.padding(4.dp)) {
+        if (loaded == null) {
+            Box(
+                modifier = Modifier
+                    .size(width = 160.dp, height = 110.dp)
+                    .clip(shape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
-                    text = message.text,
-                    style = MaterialTheme.typography.bodyMedium
+                    text = "Memuat foto...",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+        } else {
+            Image(
+                modifier = Modifier
+                    .widthIn(max = 260.dp)
+                    .heightIn(max = 220.dp)
+                    .clip(shape)
+                    .clickable(onClick = onClick),
+                bitmap = loaded,
+                contentDescription = "Foto",
+                contentScale = ContentScale.Fit
+            )
+        }
+    }
+}
+
+@Composable
+private fun AudioBubble(playing: Boolean, durationMs: Long, onPlay: () -> Unit) {
+    Row(
+        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primary)
+                .clickable(onClick = onPlay),
+            contentAlignment = Alignment.Center
+        ) {
+            if (playing) {
+                Box(
+                    modifier = Modifier
+                        .size(14.dp)
+                        .background(MaterialTheme.colorScheme.onPrimary, RoundedCornerShape(3.dp))
+                )
+            } else {
+                Icon(
+                    modifier = Modifier.size(24.dp),
+                    painter = painterResource(R.drawable.ic_play_arrow_filled),
+                    contentDescription = "Putar",
+                    tint = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+        }
+        Column {
+            Text(
+                text = if (playing) "Memutar..." else "Pesan suara",
+                style = MaterialTheme.typography.labelLarge
+            )
+            Text(
+                text = formatDuration(durationMs),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
