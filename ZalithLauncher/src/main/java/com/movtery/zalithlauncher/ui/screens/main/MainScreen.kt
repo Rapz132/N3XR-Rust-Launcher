@@ -102,6 +102,7 @@ import com.movtery.zalithlauncher.ui.screens.NormalNavKey
 import com.movtery.zalithlauncher.ui.screens.TitledNavKey
 import com.movtery.zalithlauncher.ui.screens.content.AccountManageScreen
 import com.movtery.zalithlauncher.ui.screens.content.ChatDialog
+import com.movtery.zalithlauncher.ui.screens.content.MusicDialog
 import com.movtery.zalithlauncher.ui.screens.content.DownloadScreen
 import com.movtery.zalithlauncher.ui.screens.content.FileSelectorScreen
 import com.movtery.zalithlauncher.ui.screens.content.LauncherScreen
@@ -155,6 +156,7 @@ fun MainScreen(
 
     val isTaskMenuExpanded = LauncherSettings.launcherTaskMenuExpanded.state
     var showChat by remember { mutableStateOf(false) }
+    var showMusic by remember { mutableStateOf(false) }
 
     fun changeTasksExpandedState() {
         LauncherSettings.launcherTaskMenuExpanded.save(!isTaskMenuExpanded)
@@ -203,6 +205,9 @@ fun MainScreen(
             if (showChat) {
                 ChatDialog(onDismiss = { showChat = false })
             }
+            if (showMusic) {
+                MusicDialog(onDismiss = { showMusic = false })
+            }
 
             TopBar(
                 modifier = Modifier
@@ -240,6 +245,7 @@ fun MainScreen(
                     )
                 },
                 openChat = { showChat = true },
+                openMusic = { showMusic = true },
                 changeExpandedState = {
                     changeTasksExpandedState()
                 },
@@ -292,6 +298,7 @@ private fun <E: TitledNavKey> TopBar(
     toMultiplayerScreen: () -> Unit,
     openFileManager: () -> Unit,
     openChat: () -> Unit,
+    openMusic: () -> Unit,
     changeExpandedState: () -> Unit,
 ) {
     val festivals = LocalFestivals.current
@@ -452,6 +459,15 @@ private fun <E: TitledNavKey> TopBar(
                     Icon(
                         painter = painterResource(R.drawable.ic_n3x_chat),
                         contentDescription = "Chat"
+                    )
+                }
+
+                IconButton(
+                    onClick = openMusic
+                ) {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_n3x_music),
+                        contentDescription = "Musik"
                     )
                 }
 
