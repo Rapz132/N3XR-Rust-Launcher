@@ -91,6 +91,11 @@ object LauncherSettings : SettingsRegistry() {
     val launcherTaskMenuExpanded = boolSetting("launcherTaskMenuExpanded", true)
 
     /**
+     * Menu pengaturan di sisi kiri home: terbuka atau tertutup
+     */
+    val launcherHomeMenuExpanded = boolSetting("launcherHomeMenuExpanded", true)
+
+    /**
      * 启动器背景元素不透明度
      */
     val launcherBackgroundOpacity = intSetting("launcherBackgroundOpacity", 80, 20..100)
