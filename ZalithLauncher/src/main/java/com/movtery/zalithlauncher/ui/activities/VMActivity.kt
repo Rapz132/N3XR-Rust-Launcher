@@ -130,6 +130,7 @@ import com.movtery.zalithlauncher.ui.control.input.HidableInputLayout
 import com.movtery.zalithlauncher.ui.control.input.InputMagnifier
 import com.movtery.zalithlauncher.ui.control.input.InputMagnifierState
 import com.movtery.zalithlauncher.ui.control.input.TextInputMode
+import com.movtery.zalithlauncher.ui.screens.content.ChatDialog
 import com.movtery.zalithlauncher.ui.screens.game.elements.OpenFolderLayer
 import com.movtery.zalithlauncher.ui.screens.game.elements.OpenFolderOperation
 import com.movtery.zalithlauncher.ui.theme.ZalithLauncherTheme
@@ -1026,6 +1027,37 @@ class VMActivity : BaseAppCompatActivity(), SurfaceTextureListener {
             )
 
             content()
+
+            //Tombol chat grup di dalam game
+            var showChat by remember { mutableStateOf(false) }
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp),
+                shape = MaterialTheme.shapes.medium,
+                color = Color.Black.copy(alpha = 0.45f),
+                contentColor = Color.White
+            ) {
+                IconButton(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .focusProperties { canFocus = false },
+                    onClick = {
+                        showChat = true
+                        vmViewModel.keyHandle = false
+                    }
+                ) {
+                    Text("💬")
+                }
+            }
+            if (showChat) {
+                ChatDialog(
+                    onDismiss = {
+                        showChat = false
+                        vmViewModel.keyHandle = true
+                    }
+                )
+            }
 
             InputMagnifier(
                 inputEnabled = vmViewModel.textInputMode == TextInputMode.ENABLE,
