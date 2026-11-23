@@ -155,7 +155,7 @@ fun VersionSettingsScreen(
     }
 }
 
-private val settingItems = listOf(
+private val versionSettingItems = listOf(
     CategoryItem(NormalNavKey.Versions.OverView, { CategoryIcon(R.drawable.ic_dashboard_outlined, R.string.versions_settings_overview) }, R.string.versions_settings_overview),
     CategoryItem(NormalNavKey.Versions.Config, { CategoryIcon(R.drawable.ic_build_outlined, R.string.versions_settings_config) }, R.string.versions_settings_config),
     CategoryItem(NormalNavKey.Versions.ModifyVersion, { CategoryIcon(R.drawable.ic_edit_outlined, R.string.versions_modify_version) }, R.string.versions_modify_version),
@@ -187,7 +187,7 @@ private fun TabMenu(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(12.dp))
-        settingItems.forEach { item ->
+        versionSettingItems.forEach { item ->
             if (item.division) {
                 HorizontalDivider(
                     modifier = Modifier
