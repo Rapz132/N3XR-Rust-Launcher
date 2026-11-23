@@ -447,9 +447,9 @@ private fun <E: TitledNavKey> TopBar(
                 IconButton(
                     onClick = openChat
                 ) {
-                    Text(
-                        text = "Chat",
-                        style = MaterialTheme.typography.labelMedium
+                    Icon(
+                        painter = painterResource(R.drawable.ic_n3x_chat),
+                        contentDescription = "Chat"
                     )
                 }
 
