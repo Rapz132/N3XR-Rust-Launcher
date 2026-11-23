@@ -48,7 +48,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -63,7 +62,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -525,8 +523,17 @@ private fun RoomContent(code: String, onClose: () -> Unit) {
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                EmojiButton("📷", enabled = connected) { imageLauncher.launch("image/*") }
-                EmojiButton("🎤", enabled = connected, onClick = onMicClick)
+                IconActionButton(
+                    iconRes = R.drawable.ic_n3x_image,
+                    description = "Kirim gambar",
+                    enabled = connected
+                ) { imageLauncher.launch("image/*") }
+                IconActionButton(
+                    iconRes = R.drawable.ic_n3x_mic,
+                    description = "Pesan suara",
+                    enabled = connected,
+                    onClick = onMicClick
+                )
 
                 OutlinedTextField(
                     modifier = Modifier.weight(1f),
@@ -554,7 +561,15 @@ private fun RoomContent(code: String, onClose: () -> Unit) {
                     enabled = canSend,
                     onClick = send
                 ) {
-                    Text(if (remainingSec > 0) "Kirim ($remainingSec)" else "Kirim")
+                    if (remainingSec > 0) {
+                        Text("$remainingSec")
+                    } else {
+                        Icon(
+                            modifier = Modifier.size(22.dp),
+                            painter = painterResource(R.drawable.ic_n3x_send),
+                            contentDescription = "Kirim"
+                        )
+                    }
                 }
             }
         }
@@ -586,12 +601,17 @@ private fun CloseButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun EmojiButton(emoji: String, enabled: Boolean, onClick: () -> Unit) {
+private fun IconActionButton(
+    iconRes: Int,
+    description: String,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
     IconButton(onClick = onClick, enabled = enabled) {
-        Text(
-            modifier = Modifier.alpha(if (enabled) 1f else 0.4f),
-            text = emoji,
-            fontSize = 22.sp
+        Icon(
+            modifier = Modifier.size(24.dp),
+            painter = painterResource(iconRes),
+            contentDescription = description
         )
     }
 }
