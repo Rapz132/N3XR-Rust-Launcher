@@ -27,6 +27,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 private const val TAG = "ChatManager"
 
+enum class ChatMessageType { Text, Image, Audio }
+
 data class ChatMessage(
     val id: String,
     val senderId: String,
@@ -34,7 +36,12 @@ data class ChatMessage(
     val text: String,
     val isAdmin: Boolean,
     val time: Long,
-    val isSystem: Boolean = false
+    val isSystem: Boolean = false,
+    val type: ChatMessageType = ChatMessageType.Text,
+    /** Data foto / suara dalam base64 (null untuk pesan teks) */
+    val media: String? = null,
+    /** Durasi pesan suara (ms) */
+    val durationMs: Long = 0L
 )
 
 enum class ChatState { Idle, Connecting, Connected, Error }
@@ -46,8 +53,15 @@ enum class ChatState { Idle, Connecting, Connected, Error }
 object ChatManager {
     const val COOLDOWN_MS = 3000L
     const val CODE_LENGTH = 8
+
+    /** Batas panjang base64 untuk foto / suara (Supabase free membatasi pesan ±250KB) */
+    const val MAX_MEDIA_CHARS = 180_000
+
+    /** Durasi maksimal pesan suara */
+    const val MAX_AUDIO_MS = 30_000L
+
     private const val MAX_TEXT = 300
-    private const val MAX_MESSAGES = 200
+    private const val MAX_MESSAGES = 100
     private const val CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
     /** ID unik tiap kali aplikasi dibuka, dipakai menandai pesan milik sendiri */
@@ -112,7 +126,34 @@ object ChatManager {
     /** Kirim pesan. False kalau ditolak (kosong, belum tersambung, atau masih cooldown). */
     fun sendMessage(text: String): Boolean {
         val clean = text.trim().take(MAX_TEXT)
-        if (clean.isEmpty() || _state.value != ChatState.Connected) return false
+        if (clean.isEmpty()) return false
+        return sendPayload {
+            addProperty("type", "text")
+            addProperty("text", clean)
+        }
+    }
+
+    /** Kirim foto (JPEG base64). */
+    fun sendImage(base64: String): Boolean {
+        if (base64.isEmpty() || base64.length > MAX_MEDIA_CHARS) return false
+        return sendPayload {
+            addProperty("type", "image")
+            addProperty("media", base64)
+        }
+    }
+
+    /** Kirim pesan suara (AAC/M4A base64). */
+    fun sendAudio(base64: String, durationMs: Long): Boolean {
+        if (base64.isEmpty() || base64.length > MAX_MEDIA_CHARS) return false
+        return sendPayload {
+            addProperty("type", "audio")
+            addProperty("media", base64)
+            addProperty("dur", durationMs.coerceIn(0L, MAX_AUDIO_MS))
+        }
+    }
+
+    private fun sendPayload(fill: JsonObject.() -> Unit): Boolean {
+        if (_state.value != ChatState.Connected) return false
         val now = System.currentTimeMillis()
         if (now - _lastSentAt.value < COOLDOWN_MS) return false
         _lastSentAt.value = now
@@ -120,9 +161,9 @@ object ChatManager {
             addProperty("id", UUID.randomUUID().toString())
             addProperty("senderId", clientId)
             addProperty("name", userName)
-            addProperty("text", clean)
             addProperty("admin", _isAdmin.value)
             addProperty("ts", now)
+            fill()
         })
         return true
     }
@@ -223,6 +264,32 @@ object ChatManager {
         _messages.update { (it + message).takeLast(MAX_MESSAGES) }
     }
 
+    private fun parseMessage(data: JsonObject): ChatMessage? {
+        val type = when (data.str("type")) {
+            "image" -> ChatMessageType.Image
+            "audio" -> ChatMessageType.Audio
+            else -> ChatMessageType.Text
+        }
+        val media = data.str("media")
+        if (type != ChatMessageType.Text && (media == null || media.length > MAX_MEDIA_CHARS + 1_000)) {
+            return null
+        }
+        val duration = data.get("dur")?.takeIf { it.isJsonPrimitive }?.asLong ?: 0L
+
+        return ChatMessage(
+            id = data.str("id") ?: UUID.randomUUID().toString(),
+            senderId = data.str("senderId") ?: "",
+            sender = data.str("name") ?: "Pemain",
+            text = (data.str("text") ?: "").take(MAX_TEXT),
+            isAdmin = data.get("admin")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
+            time = data.get("ts")?.takeIf { it.isJsonPrimitive }?.asLong
+                ?: System.currentTimeMillis(),
+            type = type,
+            media = if (type == ChatMessageType.Text) null else media,
+            durationMs = duration.coerceIn(0L, MAX_AUDIO_MS + 2_000L)
+        )
+    }
+
     private fun handle(text: String) {
         val obj = runCatching { JsonParser.parseString(text).asJsonObject }.getOrNull() ?: return
         val event = obj.str("event")
@@ -244,17 +311,7 @@ object ChatManager {
                 val payload = obj.obj("payload") ?: return
                 val data = payload.obj("payload") ?: return
                 when (payload.str("event")) {
-                    "msg" -> addMessage(
-                        ChatMessage(
-                            id = data.str("id") ?: UUID.randomUUID().toString(),
-                            senderId = data.str("senderId") ?: "",
-                            sender = data.str("name") ?: "Pemain",
-                            text = (data.str("text") ?: "").take(MAX_TEXT),
-                            isAdmin = data.get("admin")?.takeIf { it.isJsonPrimitive }?.asBoolean ?: false,
-                            time = data.get("ts")?.takeIf { it.isJsonPrimitive }?.asLong
-                                ?: System.currentTimeMillis()
-                        )
-                    )
+                    "msg" -> parseMessage(data)?.let { addMessage(it) }
                     "join" -> addSystem("${data.str("name") ?: "Pemain"} bergabung")
                     "leave" -> addSystem("${data.str("name") ?: "Pemain"} keluar")
                 }
