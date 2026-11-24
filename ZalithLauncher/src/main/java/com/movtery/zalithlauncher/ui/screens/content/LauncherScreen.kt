@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Zalith Launcher 2
  * Copyright (C) 2025-2026 MovTery <movtery228@qq.com> and contributors
  *
@@ -92,6 +92,7 @@ import com.movtery.zalithlauncher.ui.base.BaseScreen
 import com.movtery.zalithlauncher.ui.components.AnimatedDirection
 import com.movtery.zalithlauncher.ui.components.BackgroundCard
 import com.movtery.zalithlauncher.ui.components.CutoutBox
+import com.movtery.zalithlauncher.ui.components.GlassPanel
 import com.movtery.zalithlauncher.ui.components.MarqueeText
 import com.movtery.zalithlauncher.ui.components.PetModelView
 import com.movtery.zalithlauncher.ui.components.ScalingIconButton
@@ -709,18 +710,25 @@ private fun ActionMenu(
 ) {
     val ctx = rememberAnimatedContext(isVisible = isVisible)
 
-    ActionMenuContent(
+    // Seluruh panel (model karakter + kartu akun + kartu versi) dibungkus panel kaca
+    GlassPanel(
         modifier = modifier
             .graphicsLayer {
                 val scale = pickUpScale()
                 scaleX = scale
                 scaleY = scale
             }
-            .animated(ctx, from = swapDirection),
-        dockedSide = dockedSide,
-        onLaunchGame = onLaunchGame,
-        toAccountManageScreen = toAccountManageScreen,
-        toVersionManageScreen = toVersionManageScreen,
-        toVersionSettingsScreen = toVersionSettingsScreen,
-    )
+            .animated(ctx, from = swapDirection)
+    ) {
+        ActionMenuContent(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(all = 10.dp),
+            dockedSide = dockedSide,
+            onLaunchGame = onLaunchGame,
+            toAccountManageScreen = toAccountManageScreen,
+            toVersionManageScreen = toVersionManageScreen,
+            toVersionSettingsScreen = toVersionSettingsScreen,
+        )
+    }
 }
