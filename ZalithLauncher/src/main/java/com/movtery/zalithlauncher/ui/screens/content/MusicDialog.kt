@@ -1,5 +1,8 @@
 package com.movtery.zalithlauncher.ui.screens.content
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -61,6 +64,16 @@ import kotlinx.coroutines.withContext
 fun MusicDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
     remember { MusicManager.init(context) }
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= 33 &&
+            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
     var tab by remember { mutableIntStateOf(0) }
 
     Dialog(
