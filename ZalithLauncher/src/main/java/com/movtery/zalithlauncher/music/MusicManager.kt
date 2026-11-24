@@ -1,9 +1,11 @@
 package com.movtery.zalithlauncher.music
 
 import android.content.Context
+import android.content.Intent
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.OpenableColumns
+import androidx.core.content.ContextCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -129,6 +131,24 @@ object MusicManager {
         p.prepare()
         p.play()
         _current.value = tracks[index]
+        startService()
+    }
+
+    /** Hentikan musik sepenuhnya dan kosongkan antrean. */
+    fun stop() {
+        val p = player ?: return
+        p.stop()
+        p.clearMediaItems()
+        queue = emptyList()
+        _current.value = null
+        _isPlaying.value = false
+    }
+
+    private fun startService() {
+        val ctx = appContext ?: return
+        runCatching {
+            ContextCompat.startForegroundService(ctx, Intent(ctx, MusicService::class.java))
+        }.onFailure { Logger.warning(TAG, "Failed to start music service: ${it.message}") }
     }
 
     fun toggle() {
