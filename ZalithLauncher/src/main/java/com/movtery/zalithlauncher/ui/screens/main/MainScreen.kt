@@ -92,6 +92,7 @@ import com.movtery.zalithlauncher.ui.AndroidStringText
 import com.movtery.zalithlauncher.ui.androidText
 import com.movtery.zalithlauncher.ui.components.BackgroundCard
 import com.movtery.zalithlauncher.ui.components.CardTitleLayout
+import com.movtery.zalithlauncher.ui.components.GlassPanel
 import com.movtery.zalithlauncher.ui.components.TextRailItem
 import com.movtery.zalithlauncher.ui.guide.sendStartGuideOnce
 import com.movtery.zalithlauncher.ui.screens.BackStackNavKey
@@ -212,7 +213,7 @@ fun MainScreen(
             TopBar(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .height(56.dp),
                 mainScreenKey = mainScreenKey,
                 inLauncherScreen = inLauncherScreen,
                 taskRunning = taskRunning,
@@ -453,59 +454,72 @@ private fun <E: TitledNavKey> TopBar(
                     }
                 }
 
-                IconButton(
-                    onClick = openChat
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_n3x_chat),
-                        contentDescription = "Chat"
-                    )
+                GlassPanel(modifier = Modifier.height(44.dp)) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .padding(horizontal = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        IconButton(
+                            modifier = Modifier.size(40.dp),
+                            onClick = openChat
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_n3x_chat),
+                                contentDescription = "Chat"
+                            )
+                        }
+
+                        IconButton(
+                            modifier = Modifier.size(40.dp),
+                            onClick = openMusic
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_n3x_music),
+                                contentDescription = "Musik"
+                            )
+                        }
+
+                        IconButton(
+                            modifier = Modifier.size(40.dp),
+                            onClick = openFileManager
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_folder_filled),
+                                contentDescription = null
+                            )
+                        }
+
+                        TopBarRailItem(
+                            selected = inMultiplayerScreen,
+                            painter = painterResource(R.drawable.ic_group_filled),
+                            text = stringResource(R.string.terracotta),
+                            onClick = {
+                                if (!inMultiplayerScreen) toMultiplayerScreen()
+                            },
+                        )
+
+                        TopBarRailItem(
+                            selected = inDownloadScreen,
+                            painter = painterResource(R.drawable.ic_download_2_filled),
+                            text = stringResource(R.string.generic_download),
+                            onClick = {
+                                if (!inDownloadScreen) toDownloadScreen()
+                            },
+                        )
+
+                        TopBarRailItem(
+                            selected = inSettingsScreen,
+                            painter = painterResource(R.drawable.ic_settings_filled),
+                            text = stringResource(R.string.generic_setting),
+                            onClick = {
+                                if (!inSettingsScreen) toSettingsScreen()
+                            },
+                        )
+                    }
                 }
-
-                IconButton(
-                    onClick = openMusic
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_n3x_music),
-                        contentDescription = "Musik"
-                    )
-                }
-
-                IconButton(
-                    onClick = openFileManager
-                ) {
-                    Icon(
-                        painter = painterResource(R.drawable.ic_folder_filled),
-                        contentDescription = null
-                    )
-                }
-
-                TopBarRailItem(
-                    selected = inMultiplayerScreen,
-                    painter = painterResource(R.drawable.ic_group_filled),
-                    text = stringResource(R.string.terracotta),
-                    onClick = {
-                        if (!inMultiplayerScreen) toMultiplayerScreen()
-                    },
-                )
-
-                TopBarRailItem(
-                    selected = inDownloadScreen,
-                    painter = painterResource(R.drawable.ic_download_2_filled),
-                    text = stringResource(R.string.generic_download),
-                    onClick = {
-                        if (!inDownloadScreen) toDownloadScreen()
-                    },
-                )
-
-                TopBarRailItem(
-                    selected = inSettingsScreen,
-                    painter = painterResource(R.drawable.ic_settings_filled),
-                    text = stringResource(R.string.generic_setting),
-                    onClick = {
-                        if (!inSettingsScreen) toSettingsScreen()
-                    },
-                )
             }
         }
     }
@@ -599,6 +613,12 @@ private fun NavigationUI(
                             enter = expandHorizontally() + fadeIn(),
                             exit = shrinkHorizontally() + fadeOut()
                         ) {
+                            GlassPanel(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .padding(start = 10.dp, top = 6.dp, bottom = 12.dp)
+                            ) {
+                                Box(modifier = Modifier.padding(end = 8.dp)) {
                             TabMenu(
                                 modifier = Modifier.fillMaxHeight(),
                                 isVisible = true,
@@ -611,6 +631,8 @@ private fun NavigationUI(
                                     screenBackStackModel.settingsScreen.backStack.navigateOnce(settingKey)
                                 }
                             )
+                                }
+                            }
                         }
                         //Tombol buka/tutup menu
                         Box(
