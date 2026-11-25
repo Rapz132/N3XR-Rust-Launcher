@@ -93,6 +93,7 @@ import com.movtery.zalithlauncher.ui.androidText
 import com.movtery.zalithlauncher.ui.components.BackgroundCard
 import com.movtery.zalithlauncher.ui.components.CardTitleLayout
 import com.movtery.zalithlauncher.ui.components.GlassPanel
+import com.movtery.zalithlauncher.ui.components.pressGlow
 import com.movtery.zalithlauncher.ui.components.TextRailItem
 import com.movtery.zalithlauncher.ui.guide.sendStartGuideOnce
 import com.movtery.zalithlauncher.ui.screens.BackStackNavKey
@@ -463,7 +464,7 @@ private fun <E: TitledNavKey> TopBar(
                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         IconButton(
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.size(40.dp).pressGlow(),
                             onClick = openChat
                         ) {
                             Icon(
@@ -473,7 +474,7 @@ private fun <E: TitledNavKey> TopBar(
                         }
 
                         IconButton(
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.size(40.dp).pressGlow(),
                             onClick = openMusic
                         ) {
                             Icon(
@@ -483,7 +484,7 @@ private fun <E: TitledNavKey> TopBar(
                         }
 
                         IconButton(
-                            modifier = Modifier.size(40.dp),
+                            modifier = Modifier.size(40.dp).pressGlow(),
                             onClick = openFileManager
                         ) {
                             Icon(
@@ -493,6 +494,7 @@ private fun <E: TitledNavKey> TopBar(
                         }
 
                         TopBarRailItem(
+                            modifier = Modifier.pressGlow(),
                             selected = inMultiplayerScreen,
                             painter = painterResource(R.drawable.ic_group_filled),
                             text = stringResource(R.string.terracotta),
@@ -502,6 +504,7 @@ private fun <E: TitledNavKey> TopBar(
                         )
 
                         TopBarRailItem(
+                            modifier = Modifier.pressGlow(),
                             selected = inDownloadScreen,
                             painter = painterResource(R.drawable.ic_download_2_filled),
                             text = stringResource(R.string.generic_download),
@@ -511,6 +514,7 @@ private fun <E: TitledNavKey> TopBar(
                         )
 
                         TopBarRailItem(
+                            modifier = Modifier.pressGlow(),
                             selected = inSettingsScreen,
                             painter = painterResource(R.drawable.ic_settings_filled),
                             text = stringResource(R.string.generic_setting),
@@ -642,7 +646,7 @@ private fun NavigationUI(
                             contentAlignment = Alignment.Center
                         ) {
                             IconButton(
-                                modifier = Modifier.size(32.dp),
+                                modifier = Modifier.size(32.dp).pressGlow(),
                                 onClick = {
                                     LauncherSettings.launcherHomeMenuExpanded.save(!homeMenuExpanded)
                                 }
