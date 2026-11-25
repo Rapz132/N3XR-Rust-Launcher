@@ -175,7 +175,11 @@ fun MainScreen(
     val isBackgroundValid = LocalBackgroundViewModel.current?.isValid == true
     val launcherBackgroundOpacity = LauncherSettings.launcherBackgroundOpacity.state.toFloat() / 100f
 
-    val backgroundColor = if (isBackgroundValid) {
+    //Background gambar/video hanya tampil di home kalau opsi "hanya di home" aktif
+    val backgroundHomeOnly = LauncherSettings.backgroundHomeOnly.state
+    val showBackground = isBackgroundValid && (!backgroundHomeOnly || inLauncherScreen)
+
+    val backgroundColor = if (showBackground) {
         backgroundColor().copy(alpha = launcherBackgroundOpacity)
     } else backgroundColor()
 
