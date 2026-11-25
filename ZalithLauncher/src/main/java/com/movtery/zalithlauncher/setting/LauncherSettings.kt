@@ -103,7 +103,7 @@ object LauncherSettings : SettingsRegistry() {
     /**
      * Background gambar/video hanya tampil di home (halaman lain memakai warna polos tema)
      */
-    val backgroundHomeOnly = boolSetting("backgroundHomeOnly", true)
+    val backgroundHomeOnly = boolSetting("backgroundHomeOnly", false)
 
     /**
      * 启动器视频背景音量
