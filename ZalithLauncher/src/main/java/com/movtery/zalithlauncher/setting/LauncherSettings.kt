@@ -101,6 +101,11 @@ object LauncherSettings : SettingsRegistry() {
     val launcherBackgroundOpacity = intSetting("launcherBackgroundOpacity", 80, 20..100)
 
     /**
+     * Background gambar/video hanya tampil di home (halaman lain memakai warna polos tema)
+     */
+    val backgroundHomeOnly = boolSetting("backgroundHomeOnly", true)
+
+    /**
      * 启动器视频背景音量
      */
     val videoBackgroundVolume = intSetting("videoBackgroundVolume", 0, 0..100)
