@@ -48,6 +48,7 @@ import com.movtery.zalithlauncher.ui.components.AnimatedDirection
 import com.movtery.zalithlauncher.ui.components.MarqueeText
 import com.movtery.zalithlauncher.ui.components.animated
 import com.movtery.zalithlauncher.ui.components.fadeEdge
+import com.movtery.zalithlauncher.ui.components.pressGlow
 import com.movtery.zalithlauncher.ui.components.rememberAnimatedContext
 import com.movtery.zalithlauncher.ui.screens.NestedNavDisplay
 import com.movtery.zalithlauncher.ui.screens.NestedNavKey
@@ -152,6 +153,7 @@ fun TabMenu(
             }
 
             NavigationRailItem(
+                modifier = Modifier.pressGlow(persistent = settingsScreenKey == item.key),
                 selected = settingsScreenKey == item.key,
                 onClick = {
                     navigateTo(item.key)
