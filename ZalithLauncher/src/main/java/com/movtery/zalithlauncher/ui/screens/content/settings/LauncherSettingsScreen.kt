@@ -264,6 +264,14 @@ fun LauncherSettingsScreen(
                             fineTuningControl = true
                         )
 
+                        SwitchSettingsCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            position = CardPosition.Middle,
+                            unit = LauncherSettings.backgroundHomeOnly,
+                            title = "Background hanya di home",
+                            summary = "Gambar atau video hanya tampil di halaman utama. Halaman lain memakai warna polos."
+                        )
+
                         IntSliderSettingsCard(
                             modifier = Modifier.fillMaxWidth(),
                             position = CardPosition.Middle,
